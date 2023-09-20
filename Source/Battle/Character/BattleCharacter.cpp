@@ -3,7 +3,10 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Components/WidgetComponent.h"
+#include "Net/UnrealNetwork.h"
+#include "Battle/Weapon/Weapon.h"
 
 ABattleCharacter::ABattleCharacter()
 {
@@ -18,6 +21,20 @@ ABattleCharacter::ABattleCharacter()
 	FollowCamera=CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom,USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation=false;
+
+	bUseControllerRotationYaw=false;
+	GetCharacterMovement()->bOrientRotationToMovement=true;
+
+	OverheadWidget=CreateDefaultSubobject<UWidgetComponent>("OverheadWidget");
+	OverheadWidget->SetupAttachment(GetRootComponent());
+}
+
+void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	//DOREPLIFETIME(ABattleCharacter,OverlappingWeapon);
+	DOREPLIFETIME_CONDITION(ABattleCharacter, OverlappingWeapon,COND_OwnerOnly);
 }
 
 void ABattleCharacter::BeginPlay()
@@ -38,8 +55,9 @@ void ABattleCharacter::BeginPlay()
 void ABattleCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
+
+
 
 void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -80,6 +98,34 @@ void ABattleCharacter::Look(const FInputActionValue& Value)
 	{
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void ABattleCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
+{
+	if (OverlappingWeapon)
+	{
+		OverlappingWeapon->ShowPickupWidget(true);
+	}
+	if (LastWeapon)
+	{	
+		LastWeapon->ShowPickupWidget(false);
+	}	
+}
+
+void ABattleCharacter::SetOverlappingWeapon(AWeapon* Weapon)
+{
+	if (OverlappingWeapon)
+	{
+		OverlappingWeapon->ShowPickupWidget(false);
+	}
+	OverlappingWeapon = Weapon;
+	if (IsLocallyControlled())
+	{
+		if (OverlappingWeapon)
+		{
+			OverlappingWeapon->ShowPickupWidget(true);
+		}
 	}
 }
 
