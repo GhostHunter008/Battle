@@ -22,8 +22,13 @@ class BATTLE_API AWeapon : public AActor
 public:	
 	AWeapon();
 	virtual void Tick(float DeltaTime) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	void ShowPickupWidget(bool bShowWidget);
+
+	void SetWeaponState(EWeaponState InWeaponState);
+	FORCEINLINE class USphereComponent* GetAreaSphere() const{return AreaSphere;}
+	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const{return WeaponMesh;}
 
 protected:
 	virtual void BeginPlay() override;
@@ -35,16 +40,17 @@ protected:
 
 
 private:
-	UPROPERTY(VisibleAnywhere,Category = "WeaponProperties")
+	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties")
 	USkeletalMeshComponent* WeaponMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties")
 	class USphereComponent* AreaSphere;
 
-	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties")
+	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties", ReplicatedUsing = OnRep_WeaponState)
 	EWeaponState WeaponState;
+	UFUNCTION()
+	void OnRep_WeaponState();
 
 	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties")
 	class UWidgetComponent* PickupWidget;
-
 };
