@@ -35,6 +35,8 @@ protected:
 	void CrouchButtonPress(const FInputActionValue& Value);
 	void AimButtonPress(const FInputActionValue& Value);
 	void AimButtonRelease(const FInputActionValue& Value);
+	void FireButtonPress(const FInputActionValue& Value);
+	void FireButtonRelease(const FInputActionValue& Value);
 
 private:
 	UPROPERTY(VisibleAnywhere,Category=Camera)
@@ -56,6 +58,8 @@ private:
 	class UInputAction* CrouchAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* AimAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* FireAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
 	class UWidgetComponent* OverheadWidget;
@@ -76,6 +80,8 @@ private:
 	ETurningInPlace TurningInPlace;
 	void TurnInPlace(float DeltaTime);
 
+	UPROPERTY(EditAnywhere,Category=Combat)
+	class UAnimMontage* FireWeaponMontage;
 
 public:	
 	void SetOverlappingWeapon(AWeapon* Weapon);
@@ -86,6 +92,7 @@ public:
 	FORCEINLINE float GetAOPitch() { return AO_Pitch;}
 	AWeapon* GetEquippedWeapon();
 	FORCEINLINE ETurningInPlace GetTurningInPlace()const {return TurningInPlace;}
+	void PlayFireMontage(bool bAiming);
 
 
 };

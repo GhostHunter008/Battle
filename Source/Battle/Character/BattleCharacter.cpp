@@ -99,6 +99,8 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this, &ABattleCharacter::CrouchButtonPress);
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Started, this, &ABattleCharacter::AimButtonPress);
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Completed, this, &ABattleCharacter::AimButtonRelease);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ABattleCharacter::FireButtonPress);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ABattleCharacter::FireButtonRelease);
 	}
 }
 
@@ -193,6 +195,22 @@ void ABattleCharacter::AimButtonRelease(const FInputActionValue& Value)
 	if (CombatComponent)
 	{
 		CombatComponent->SetAiming(false);
+	}
+}
+
+void ABattleCharacter::FireButtonPress(const FInputActionValue& Value)
+{
+	if (CombatComponent)
+	{
+		CombatComponent->FireButtonPress(true);
+	}
+}
+
+void ABattleCharacter::FireButtonRelease(const FInputActionValue& Value)
+{
+	if (CombatComponent)
+	{
+		CombatComponent->FireButtonPress(false);
 	}
 }
 
@@ -295,7 +313,7 @@ void ABattleCharacter::AimOffset(float DeltaTime)
 
 void ABattleCharacter::TurnInPlace(float DeltaTime)
 {
-	UE_LOG(LogTemp, Warning, TEXT("AO_Yaw: %f"), AO_Yaw);
+	// UE_LOG(LogTemp, Warning, TEXT("AO_Yaw: %f"), AO_Yaw);
 	if (AO_Yaw > 90)
 	{
 		TurningInPlace=ETurningInPlace::ETIP_Right;
@@ -322,5 +340,19 @@ AWeapon* ABattleCharacter::GetEquippedWeapon()
 	if(CombatComponent==nullptr) return nullptr;
 
 	return CombatComponent->EquippedWeapon;
+}
+
+void ABattleCharacter::PlayFireMontage(bool bAiming)
+{
+	if(CombatComponent==nullptr || CombatComponent->EquippedWeapon==nullptr) return;
+	
+	UAnimInstance* AnimInstance=GetMesh()->GetAnimInstance();
+	if (AnimInstance && FireWeaponMontage)
+	{
+		AnimInstance->Montage_Play(FireWeaponMontage);
+		FName SectionName;
+		SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		AnimInstance->Montage_JumpToSection(SectionName);
+	}
 }
 

@@ -30,6 +30,8 @@ public:
 	FORCEINLINE class USphereComponent* GetAreaSphere() const{return AreaSphere;}
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const{return WeaponMesh;}
 
+	virtual void Fire(const FVector& HitTarget);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -53,4 +55,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties")
 	class UWidgetComponent* PickupWidget;
+
+	UPROPERTY(EditAnywhere, Category = "WeaponProperties")
+	class UAnimationAsset* FireAnimation;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class ABulletShell> BulletShellClass;
 };

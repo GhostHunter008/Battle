@@ -2,13 +2,18 @@
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Battle/Character/BattleCharacter.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Animation/AnimationAsset.h"
+#include "BulletShell.h"
+#include "Engine/SkeletalMeshSocket.h"
+
 
 
 AWeapon::AWeapon()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	bReplicates=true;
+	bReplicates=true; // 只有服务器上有一把
 
 	WeaponMesh=CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	SetRootComponent(WeaponMesh);
@@ -103,6 +108,33 @@ void AWeapon::SetWeaponState(EWeaponState InWeaponState)
 		ShowPickupWidget(false);
 		AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		break;
+	}
+}
+
+void AWeapon::Fire(const FVector& HitTarget)
+{
+	if (FireAnimation)
+	{
+		WeaponMesh->PlayAnimation(FireAnimation,false);
+	}
+
+	if (BulletShellClass)
+	{
+		const USkeletalMeshSocket* AmmoEjectSocket = WeaponMesh->GetSocketByName(FName("AmmoEject"));
+		if (AmmoEjectSocket)
+		{
+			FTransform SocketTransform = AmmoEjectSocket->GetSocketTransform(WeaponMesh);
+			UWorld* World = GetWorld();
+			if (World)
+			{
+				World->SpawnActor<ABulletShell>
+					(
+						BulletShellClass,
+						SocketTransform.GetLocation(),
+						SocketTransform.GetRotation().Rotator()
+					);
+			}
+		}
 	}
 }
 
