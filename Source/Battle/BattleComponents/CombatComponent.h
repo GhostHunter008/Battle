@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+
 #include "CombatComponent.generated.h"
 
 #define TRACE_LENGTH 80000;
@@ -40,8 +41,12 @@ protected:
 
 	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
 
+	void SetHUDCrosshairs(float DeltaTime);
+
 private:
 	class ABattleCharacter* BattleCharacter;
+	class ABattlePlayerController* BattleController;
+	class ABattleHUD* BattleHUD;
 
 	UPROPERTY(ReplicatedUsing=OnRep_EquippedWeapon)
 	class AWeapon* EquippedWeapon;
@@ -55,6 +60,10 @@ private:
 	float AimWalkSpeed;
 
 	bool FireButtonPressed;
+
+	// hud and crosshairs
+	float CrosshairVelocityFactor;
+	float CrosshairInAirFactor;
 	
 	
 
