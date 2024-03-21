@@ -15,6 +15,8 @@ class BATTLE_API ALobbyGameMode : public AGameMode
 	GENERATED_BODY()
 
 public:
+	
+	// 当有玩家进入时自动调用该函数
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 
 	

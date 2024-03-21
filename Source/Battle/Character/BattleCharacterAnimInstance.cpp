@@ -19,12 +19,14 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 {
 	Super::NativeUpdateAnimation(DeltaTime);
 
+	// 确保BattleCharacter有效
 	if (BattleCharacter==nullptr)
 	{
 		BattleCharacter= Cast<ABattleCharacter>(TryGetPawnOwner());
 	}
 	if (BattleCharacter == nullptr) return;
 
+	// 计算Speed，不考虑Z轴速度
 	FVector Velocity=BattleCharacter->GetVelocity();
 	Velocity.Z=0;
 	Speed=Velocity.Size();

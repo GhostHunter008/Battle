@@ -32,11 +32,11 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
 		DestroySession();
 		return;
 		// SessionInterface->DestroySession(NAME_GameSession);
-		// Ïú»ÙÊ±ÐèÒªÍ¬²½ÖÁ·þÎñÆ÷
-		// ÐèÒª±£Ö¤Ïú»Ù³É¹¦ºóÔÙ´´½¨ÐÂµÄ»á»°,·ñÔò´´½¨½«»áÊ§°Ü
+		// é”€æ¯æ—¶éœ€è¦åŒæ­¥è‡³æœåŠ¡å™¨
+		// éœ€è¦ä¿è¯é”€æ¯æˆåŠŸåŽå†åˆ›å»ºæ–°çš„ä¼šè¯,å¦åˆ™åˆ›å»ºå°†ä¼šå¤±è´¥
 	}
 
-	 // Store the delegate in the delegatehandle
+	 // Store the delegate in the delegate handle
 	 // so we can remove the delegate from the list later
 	CreateSessionCompleteDelegateHandle = SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegate);
 
@@ -54,7 +54,7 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
 
 	if (!SessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *LastSessionSettings))
-	{
+	{// å¦‚æžœä¼šè¯åˆ›å»ºå¤±è´¥ 
 		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 
 		// Broadcast our own delegate

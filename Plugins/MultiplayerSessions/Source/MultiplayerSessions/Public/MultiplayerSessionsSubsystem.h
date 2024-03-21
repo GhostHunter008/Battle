@@ -8,9 +8,9 @@
 #include "MultiplayerSessionsSubsystem.generated.h"
 
 /*
-* Declare delegates for the menu class to bind callbacks
+* 自定义委托：Declare delegates for the menu class to bind callbacks
 */
-// ��̬�ಥ��������ͼ��ʹ�ã�����Ҳ��ζ�Ų����ṹ��������л�����������USTRUCT,UCLASS��
+// 动态多播可以在蓝图中使用，但是也意味着参数结构必须可序列化，即必须是USTRUCT,UCLASS等
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMultiplayerOnCreateSessionComplete,bool,bWasSuccessful); 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FMultiplayerOnFindSessionsComplete,const TArray<FOnlineSessionSearchResult>& SessionResults,bool bWasSuccessful);
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnJoinSessionComplete,EOnJoinSessionCompleteResult::Type Result);
@@ -19,6 +19,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMultiplayerOnStartSessionComplete, 
 /**
  * 
  */
+ // 选择UGameInstanceSubsystem作为父类
+ // 原因：和GameInstance同生命周期，可以在不同关卡中持续存在
+ // GameInstance创建时，该类型也自动被创建
 UCLASS()
 class MULTIPLAYERSESSIONS_API UMultiplayerSessionsSubsystem : public UGameInstanceSubsystem
 {
@@ -38,7 +41,7 @@ public:
 
 public:
 	/*
-	* Declare delegates for the menu class to bind callbacks
+	* 声明自定义的委托：Declare delegates for the menu class to bind callbacks
 	*/
 	FMultiplayerOnCreateSessionComplete MultiplayerOnCreateSessionComplete;
 	FMultiplayerOnFindSessionsComplete MultiplayerOnFindSessionsComplete;
@@ -64,6 +67,7 @@ private:
 
 	/*
 	* To add to the Online Session Interface delegate list;
+	* 绑定到内部回调函数，用Handle是应为方便Clear
 	*/
 	FOnCreateSessionCompleteDelegate CreateSessionCompleteDelegate;
 	FDelegateHandle CreateSessionCompleteDelegateHandle;
@@ -76,9 +80,8 @@ private:
 	FOnStartSessionCompleteDelegate StartSessionCompleteDelegate;
 	FDelegateHandle StartSessionCompleteDelegateHandle;
 
-	// ȷ��ÿ��ֻ����һ��session
-	bool bCreateSessionOnDestroy{false};
+	// 确保每次只创建一个session
+	bool bCreateSessionOnDestroy{false}; 
 	int32 LastNumPublicConnections;
 	FString LastMatchType;
-	
 };

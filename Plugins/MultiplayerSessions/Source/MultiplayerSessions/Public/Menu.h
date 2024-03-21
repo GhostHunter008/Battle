@@ -16,18 +16,21 @@ class MULTIPLAYERSESSIONS_API UMenu : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	// 在蓝图中调用，创建此控件时调用该函数
 	UFUNCTION(BlueprintCallable)
-	void MenuSetup(int32 InNumPublicConnections = 4, FString InMatchType = TEXT("FreeForAll"),FString InPathToLobby= TEXT("/Game/ThirdPerson/Maps/Lobby"));
+	void MenuSetup(int32 InNumPublicConnections = 12, FString InMatchType = TEXT("FreeForAll"),FString InPathToLobby= TEXT("/Game/ThirdPerson/Maps/Lobby"));
 
 protected:
-	virtual bool Initialize() override;
 	
-	//virtual void OnLevelRemovedFromWorld(ULevel* InLevel,UWorld* InWorld) override;
+	virtual bool Initialize() override;
+
 	virtual void NativeDestruct() override;
 
+	// 菜单关闭时的清理工作
+	void MenuTearDown();
+
 	/*
-	* callbacks for the delegate on the MultiplayerSessionSubsystem
-	* ��̬�ಥ����ҪUFUNCTION��������л�
+	* 绑定到MultiplayerSessionSubsystem中自定义委托的回调函数
 	*/
 	UFUNCTION()
 	void OnCreateSession(bool bWasSuccessful);
@@ -42,7 +45,7 @@ protected:
 private:
 	
 	UPROPERTY(meta=(BindWidget))
-	class UButton* HostButton; // must be the same name to the blueprint
+	class UButton* HostButton; 
 	
 	UPROPERTY(meta = (BindWidget))
 	class UButton* JoinButton;
@@ -53,8 +56,7 @@ private:
 	UFUNCTION()
 	void JoinButtonClicked();
 
-	void MenuTearDown();
-
+	// 对OnlineSession的所有功能做了封装
 	class UMultiplayerSessionsSubsystem* MultiplayerSessionsSubsystem;
 
 	int32 NumPublicConnections={4};

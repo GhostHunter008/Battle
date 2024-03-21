@@ -12,13 +12,13 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	if (GameState)
 	{
 		int32 NumOfPlayers = GameState->PlayerArray.Num();
-		if (NumOfPlayers == 2) // TODO
+		if (NumOfPlayers == 2) // TODO：做成一个公开的可变变量
 		{
 			UWorld* World = GetWorld();
 			if (World)
 			{
-				bUseSeamlessTravel=true;
-				World->ServerTravel(FString("/Game/Maps/BattleMap?listen"));
+				bUseSeamlessTravel=true; // 使用SeamlessTravel模式
+				World->ServerTravel(FString("/Game/Maps/BattleMap?listen")); // TODO：做成一个可在蓝图配置的字符串
 			}
 		}
 	}
