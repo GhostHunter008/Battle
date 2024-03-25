@@ -13,7 +13,7 @@
 AWeapon::AWeapon()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	bReplicates=true; // ֻ�з���������һ��
+	bReplicates=true; // 只有服务器上有一把
 
 	WeaponMesh=CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	SetRootComponent(WeaponMesh);
@@ -21,10 +21,11 @@ AWeapon::AWeapon()
 	WeaponMesh->SetCollisionResponseToAllChannels(ECR_Block);
 	WeaponMesh->SetCollisionResponseToChannel(ECC_Pawn,ECR_Ignore);
 
+	// 仅在服务器上开启碰撞，在BeginPlay中执行开启逻辑
 	AreaSphere=CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
 	AreaSphere->SetupAttachment(GetRootComponent());
+	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision); 
 	AreaSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
-	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	PickupWidget=CreateDefaultSubobject<UWidgetComponent>(TEXT("PickupWidget"));
 	PickupWidget->SetupAttachment(GetRootComponent());
@@ -39,7 +40,7 @@ void AWeapon::BeginPlay()
 		ShowPickupWidget(false);
 	}
 
-	if (HasAuthority()) // ��ͬ�ڣ�GetLocalRole() == ENetRole::ROLE_Authority
+	if (HasAuthority()) // 等同于：GetLocalRole() == ENetRole::ROLE_Authority,即在服务器上
 	{
 		AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		AreaSphere->SetCollisionResponseToChannel(ECC_Pawn,ECR_Overlap);
@@ -84,9 +85,10 @@ void AWeapon::OnRep_WeaponState()
 	switch (WeaponState)
 	{
 		case EWeaponState::EWS_Equipped:
+		{
 			ShowPickupWidget(false);
-			AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			break;
+		}
 	}
 }
 

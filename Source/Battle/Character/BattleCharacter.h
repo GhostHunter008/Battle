@@ -16,8 +16,8 @@ class BATTLE_API ABattleCharacter : public ACharacter
 public:
 	ABattleCharacter();
 	virtual void Tick(float DeltaTime) override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	virtual void PostInitializeComponents() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override; // 注册需要复制的变量
+	virtual void PostInitializeComponents() override; // 在组件初始化完成过后自动调用
 
 protected:
 	virtual void BeginPlay() override;
@@ -29,7 +29,7 @@ protected:
 	virtual void Jump() override; // 重写，让跳跃可以解除蹲伏
 	void EquipButtonPress(const FInputActionValue& Value);
 	UFUNCTION(Server, Reliable)
-	void ServerEquipButtonPressed();
+	void ServerEquipButtonPressed(); // RPC，实现加_Implement后缀
 	void CrouchButtonPress(const FInputActionValue& Value);
 	void AimButtonPress(const FInputActionValue& Value);
 	void AimButtonRelease(const FInputActionValue& Value);
@@ -62,7 +62,7 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
 	class UWidgetComponent* OverheadWidget; // 用于在人物上方显示信息
 
-	UPROPERTY(ReplicatedUsing = OnRep_OverlappingWeapon)
+	UPROPERTY(ReplicatedUsing = OnRep_OverlappingWeapon) // 仅在发生变化时同步，只同步到客户端
 	class AWeapon* OverlappingWeapon;
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);

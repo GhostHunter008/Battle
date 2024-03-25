@@ -48,10 +48,10 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 
 void UCombatComponent::SetAiming(bool InbAiming)
 {
-	bAiming=InbAiming;
+	bAiming=InbAiming; // 这一行可以不删，在服务器上调用时可以快一步设置
 	if (!BattleCharacter->HasAuthority())
 	{// Client
-		ServerSetAiming(InbAiming);
+		ServerSetAiming(InbAiming); // 因为bAiming是Replicate的变量，因此只有客户端需要RPC
 	}
 	if (BattleCharacter)
 	{
@@ -72,7 +72,7 @@ void UCombatComponent::OnRep_EquippedWeapon()
 {
 	if (EquippedWeapon && BattleCharacter)
 	{
-		// ��controller�ӹ���ת
+		// 由controller接管旋转
 		BattleCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
 		BattleCharacter->bUseControllerRotationYaw = true;
 	}
@@ -178,15 +178,15 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 			}
 
 			// Calculate crosshair spread
-			// Ӱ������
-			// �ƶ��ٶ� ��0��600��-��0��1��
+			// 影响因素
+			// 移动速度 【0，600】-【0，1】
 			FVector2D WalkSpeedRange(0,BattleCharacter->GetCharacterMovement()->MaxWalkSpeed);
 			FVector2D VelocityMultiplierRange(0,1);
 			FVector Velocity=BattleCharacter->GetVelocity();
 			Velocity.Z=0;
 			CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(WalkSpeedRange,VelocityMultiplierRange,Velocity.Size());
 
-			// �Ƿ��ڿ��У�����Ծ��׹���
+			// 是否在空中，如跳跃、坠落等
 			if (BattleCharacter->GetCharacterMovement()->IsFalling())
 			{
 				CrosshairInAirFactor=FMath::FInterpTo(CrosshairInAirFactor,2.25,DeltaTime,2.25);
@@ -215,9 +215,9 @@ void UCombatComponent::EquipWeapon(class AWeapon* InWeapon)
 	{
 		HandSocket->AttachActor(EquippedWeapon,BattleCharacter->GetMesh());
 	}
-	EquippedWeapon->SetOwner(BattleCharacter);
+	EquippedWeapon->SetOwner(BattleCharacter); // Owner引擎已经帮我们做好了同步
 
-	// ��controller�ӹ���ת
+	// 由controller接管旋转
 	BattleCharacter->GetCharacterMovement()->bOrientRotationToMovement=false;
 	BattleCharacter->bUseControllerRotationYaw=true;
 

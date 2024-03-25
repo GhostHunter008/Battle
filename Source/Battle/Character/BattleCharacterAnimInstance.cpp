@@ -19,14 +19,14 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 {
 	Super::NativeUpdateAnimation(DeltaTime);
 
-	// ȷ��BattleCharacter��Ч
+	// 确保BattleCharacter有效
 	if (BattleCharacter==nullptr)
 	{
 		BattleCharacter= Cast<ABattleCharacter>(TryGetPawnOwner());
 	}
 	if (BattleCharacter == nullptr) return;
 
-	// ����Speed��������Z���ٶ�
+	// 计算Speed，不考虑Z轴速度
 	FVector Velocity=BattleCharacter->GetVelocity();
 	Velocity.Z=0;
 	Speed=Velocity.Size();
@@ -42,14 +42,16 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 
 	bAiming=BattleCharacter->IsAiming();
 
+	// Offest Yaw和Lean计算都建立在已经复制过的值的基础之上
+	// 每个机器跑自己的实例，因此也无需复制但是能相同
 	// Offest Yaw for Strafing
-	FRotator AimRotation = BattleCharacter->GetBaseAimRotation(); // global rotation, ȡ�����������ת
-	FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(BattleCharacter->GetVelocity()); // global rotation,ȡ�����������ת
+	FRotator AimRotation = BattleCharacter->GetBaseAimRotation(); // global rotation, 取决于相机的旋转，世界X轴为0，Y轴为90
+	FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(BattleCharacter->GetVelocity()); // global rotation,速度是一个向量，取决于人物运动的朝向
 	FRotator DeltaRot=UKismetMathLibrary::NormalizedDeltaRotator(MovementRotation,AimRotation);
-	DeltaRotation=FMath::RInterpTo(DeltaRotation,DeltaRot,DeltaTime,6);
+	DeltaRotation=FMath::RInterpTo(DeltaRotation,DeltaRot,DeltaTime,6); // 插值时会走最短路径
 	YawOffset=DeltaRotation.Yaw;
 	
-	// Lean
+	// Lean : 用鼠标旋转的速度衡量
 	CharacterRotationLastFrame=CharacterRotationCurFrame;
 	CharacterRotationCurFrame=BattleCharacter->GetActorRotation();
 	const FRotator Delta = UKismetMathLibrary::NormalizedDeltaRotator(CharacterRotationCurFrame,CharacterRotationLastFrame);
@@ -64,13 +66,15 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	//IK
 	if (bWeaponEquipped && EquippedWeapon && EquippedWeapon->GetWeaponMesh() && BattleCharacter->GetMesh())
 	{
-		LeftHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket"));
+		LeftHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket")); // 获取的是LeftHandSocket世界空间位置
 		FVector OutPosition;
 		FRotator OutRotation;
-		BattleCharacter->GetMesh()->TransformToBoneSpace(FName("hand_r"),LeftHandTransform.GetLocation(), FRotator::ZeroRotator, OutPosition,OutRotation);
+		// 将LeftHandSocket世界空间位置以右手的位置为参考，转到骨骼空间下的坐标
+		BattleCharacter->GetMesh()->TransformToBoneSpace(FName("hand_r"),LeftHandTransform.GetLocation(), FRotator::ZeroRotator, OutPosition,OutRotation); 
 		LeftHandTransform.SetLocation(OutPosition);
 		LeftHandTransform.SetRotation(FQuat(OutRotation));
 	}
 
+	// TurningInPlace
 	TurningInPlace=BattleCharacter->GetTurningInPlace();
 }

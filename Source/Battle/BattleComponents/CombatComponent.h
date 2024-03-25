@@ -13,8 +13,8 @@ class BATTLE_API UCombatComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:	
+	friend class ABattleCharacter; // 强关联性
 	UCombatComponent();
-	friend class ABattleCharacter;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	

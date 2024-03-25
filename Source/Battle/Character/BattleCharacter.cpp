@@ -14,8 +14,8 @@
 ABattleCharacter::ABattleCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	NetUpdateFrequency=66;
-	MinNetUpdateFrequency=33;
+	NetUpdateFrequency=66; // 网络平稳时replicate的频率
+	MinNetUpdateFrequency=33; // 网络波动时replicate的频率
 
 	CameraBoom=CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetMesh());
@@ -34,10 +34,10 @@ ABattleCharacter::ABattleCharacter()
 	OverheadWidget->SetupAttachment(GetRootComponent());
 
 	CombatComponent=CreateDefaultSubobject<UCombatComponent>("CombatComponent");
-	CombatComponent->SetIsReplicated(true);
+	CombatComponent->SetIsReplicated(true); // Component无需在GetLifetimeReplicatedProps中注册
 
-	GetCharacterMovement()->NavAgentProps.bCanCrouch=true; //����׵�����
-	GetCharacterMovement()->RotationRate.Yaw=850; // ת�����ٶ�
+	GetCharacterMovement()->NavAgentProps.bCanCrouch=true; //赋予蹲的能力。蓝图中也可以勾选，这里是启用默认值
+	GetCharacterMovement()->RotationRate.Yaw=850; // 转身的速度
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera,ECollisionResponse::ECR_Ignore);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 
@@ -49,7 +49,7 @@ void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	//DOREPLIFETIME(ABattleCharacter,OverlappingWeapon);
-	DOREPLIFETIME_CONDITION(ABattleCharacter, OverlappingWeapon,COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(ABattleCharacter, OverlappingWeapon,COND_OwnerOnly); // 只同步到拥有的客户端（确定了同步给谁）
 }
 
 void ABattleCharacter::PostInitializeComponents()
@@ -171,7 +171,7 @@ void ABattleCharacter::ServerEquipButtonPressed_Implementation()
 
 void ABattleCharacter::CrouchButtonPress(const FInputActionValue& Value)
 {
-	if (bIsCrouched)
+	if (bIsCrouched) //虚幻内置已经处理好，自动同步过
 	{
 		UnCrouch();
 	}
@@ -214,7 +214,7 @@ void ABattleCharacter::FireButtonRelease(const FInputActionValue& Value)
 	}
 }
 
-void ABattleCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
+void ABattleCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon) // 确定了接收到Rep的行为
 {
 	if (OverlappingWeapon)
 	{
@@ -227,15 +227,16 @@ void ABattleCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
 }
 
 
-
+// 服务端单独处理：实质上这个函数也只有服务端回调
 void ABattleCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
 	if (OverlappingWeapon)
 	{
 		OverlappingWeapon->ShowPickupWidget(false);
 	}
+
 	OverlappingWeapon = Weapon;
-	if (IsLocallyControlled())
+	if (IsLocallyControlled()) // 服务器端的逻辑单独处理
 	{
 		if (OverlappingWeapon)
 		{
@@ -271,14 +272,13 @@ void ABattleCharacter::AimOffset(float DeltaTime)
 		AO_Yaw=DeltaAimRotation.Yaw;
 		if (TurningInPlace == ETurningInPlace::ETIP_NotTurning)
 		{
-			Interp_AO_Yaw=AO_Yaw;
+			Interp_AO_Yaw=AO_Yaw; // Interp_AO_Yaw在转身时逐步插值为0
 		}
 		bUseControllerRotationYaw=true;
 
 		TurnInPlace(DeltaTime);
 
 		/*
-		* ע�⣺�˴���busecontrollerΪfalse����ô�ӷ��������ͻ��˵�yaw�ĸ������������
 		if (HasAuthority() && !IsLocallyControlled())
 		{
 			UE_LOG(LogTemp, Warning, TEXT("standing still"));
@@ -296,8 +296,9 @@ void ABattleCharacter::AimOffset(float DeltaTime)
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 	}
 
-	// ���紫��ʱ�ᱻӳ���[0,360],������������
-	// ѹ���ͽ�ѹʱ��ʽ�����쳣
+	// 网络传输时会被映射成[0,360],即不允许负数
+	// 0 被作为分界线，0以下从360开始，即取模360
+	// 压缩和解压时格式会有异常
 	AO_Pitch=GetBaseAimRotation().Pitch;  
 	if (AO_Pitch > 90.f && !IsLocallyControlled())
 	{
@@ -306,11 +307,13 @@ void ABattleCharacter::AimOffset(float DeltaTime)
 	}
 
 	/*
-	* ͨ��������������������Ӧ��ֵ����debug
+	* 通过组合这两个条件输出对应的值进行debug
 	if (!HasAuthority() && !IsLocallyControlled())
 	*/
 }
 
+// 转身动画实质上只是播放，并不改变朝向
+// 通过动画的的节点rotate bone改变朝向
 void ABattleCharacter::TurnInPlace(float DeltaTime)
 {
 	// UE_LOG(LogTemp, Warning, TEXT("AO_Yaw: %f"), AO_Yaw);

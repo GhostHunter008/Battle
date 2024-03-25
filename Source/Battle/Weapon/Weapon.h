@@ -11,7 +11,7 @@ enum class EWeaponState:uint8
 	EWS_Equipped UMETA(DisplayName = "Equipped State"),
 	EWS_Dropped UMETA(DisplayName = "Dropped State"),
 
-	EWS_MAX UMETA(DisplayName = "DefaultMAX")
+	EWS_MAX UMETA(DisplayName = "DefaultMAX") // 可以帮助我们快速知道枚举的数量
 };
 
 UCLASS()
@@ -35,6 +35,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	// 绑定到AreaSphere的Overlap函数
 	UFUNCTION()
 	virtual void OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 	UFUNCTION()
@@ -51,7 +52,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties", ReplicatedUsing = OnRep_WeaponState)
 	EWeaponState WeaponState;
 	UFUNCTION()
-	void OnRep_WeaponState();
+	void OnRep_WeaponState(); // ShowPickupWidget在服务端执行后并不会复制，但状态会复制，可以通过RepNotify来实现
 
 	UPROPERTY(VisibleAnywhere, Category = "WeaponProperties")
 	class UWidgetComponent* PickupWidget;
