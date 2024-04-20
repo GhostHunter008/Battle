@@ -6,8 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "Projectile.generated.h"
 
-// Ö»ÔÚ·şÎñÆ÷Éú³É
-// Í¬²½µ½¸÷¿Í»§¶Ë
+// åªåœ¨æœåŠ¡å™¨ç”Ÿæˆ
+// åŒæ­¥åˆ°å„å®¢æˆ·ç«¯
 
 UCLASS()
 class BATTLE_API AProjectile : public AActor
@@ -17,14 +17,18 @@ class BATTLE_API AProjectile : public AActor
 public:	
 	AProjectile();
 	virtual void Tick(float DeltaTime) override;
-	virtual void Destroyed() override; // server ºÍ client¶¼»áµ÷ÓÃ¸Ãº¯Êı
+	virtual void Destroyed() override; // server å’Œ clientéƒ½ä¼šè°ƒç”¨è¯¥å‡½æ•°ï¼Œææ„æ—¶è‡ªåŠ¨è°ƒç”¨ï¼ˆç±»ä¼¼EndPlayï¼‰
 
 protected:
 	virtual void BeginPlay() override;
 
+	// ä»…åœ¨æœåŠ¡ç«¯è°ƒç”¨
 	UFUNCTION()
 	virtual void OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 	
+	UPROPERTY(EditAnywhere)
+	float Damage=20.f;
+
 private:
 	UPROPERTY(EditAnywhere)
 	class UBoxComponent* CollisionBox;
@@ -34,10 +38,12 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	class UParticleSystem* Tracer;
-	class UParticleSystemComponent* TracerComponent; // ·½±ã»ØÊÕ
+	class UParticleSystemComponent* TracerComponent; // æ–¹ä¾¿å›æ”¶
 	
 	UPROPERTY(EditAnywhere)
 	class UParticleSystem* ImpactParticles;
 	UPROPERTY(EditAnywhere)
 	class USoundCue* ImpactSound;
+
+
 };

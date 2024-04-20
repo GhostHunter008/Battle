@@ -2,6 +2,16 @@
 
 
 #include "BattleHUD.h"
+#include "Blueprint/UserWidget.h"
+#include "CharacterOverlay.h"
+
+void ABattleHUD::BeginPlay()
+{
+	Super::BeginPlay();
+
+	AddCharacterOverlay();
+
+}
 
 void ABattleHUD::DrawHUD()
 {
@@ -18,45 +28,45 @@ void ABattleHUD::DrawHUD()
 		if (HUDPackage.CrosshairsCenter)
 		{
 			FVector2D Spread(0,0);
-			DrawCrosshair(HUDPackage.CrosshairsCenter, ViewportCenter,Spread);
+			DrawCrosshair(HUDPackage.CrosshairsCenter, ViewportCenter,Spread,HUDPackage.CrosshairsColor);
 		}
 		if (HUDPackage.CrosshairsTop)
 		{
 			FVector2D Spread(0, SpreadScaled);
-			DrawCrosshair(HUDPackage.CrosshairsTop, ViewportCenter,Spread);
+			DrawCrosshair(HUDPackage.CrosshairsTop, ViewportCenter,Spread, HUDPackage.CrosshairsColor);
 		}
 		if (HUDPackage.CrosshairsBottom)
 		{
 			FVector2D Spread(0, -SpreadScaled);
-			DrawCrosshair(HUDPackage.CrosshairsBottom, ViewportCenter, Spread);
+			DrawCrosshair(HUDPackage.CrosshairsBottom, ViewportCenter, Spread, HUDPackage.CrosshairsColor);
 		}
 		if (HUDPackage.CrosshairsLeft)
 		{
 			FVector2D Spread(-SpreadScaled, 0);
-			DrawCrosshair(HUDPackage.CrosshairsLeft, ViewportCenter, Spread);
+			DrawCrosshair(HUDPackage.CrosshairsLeft, ViewportCenter, Spread, HUDPackage.CrosshairsColor);
 		}
 			
 		if (HUDPackage.CrosshairsRight)
 		{
 			FVector2D Spread(SpreadScaled, 0);
-			DrawCrosshair(HUDPackage.CrosshairsRight, ViewportCenter, Spread);
+			DrawCrosshair(HUDPackage.CrosshairsRight, ViewportCenter, Spread, HUDPackage.CrosshairsColor);
 		}
 			
 	}
 
 }
 
-void ABattleHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FVector2D Spread)
+void ABattleHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FVector2D Spread, FLinearColor CrosshairsColor)
 {
 	const float TextureWidth = Texture->GetSizeX();
 	const float TextureHeight = Texture->GetSizeY();
-	const FVector2D TextureDrawPoint  // ÕæÕıäÖÈ¾µÄÎ»ÖÃ
+	const FVector2D TextureDrawPoint  // çœŸæ­£æ¸²æŸ“çš„ä½ç½®(å·¦ä¸‹è§’çš„ç‚¹ä¸ºå‚è€ƒ)
 	(
 		ViewportCenter.X-(TextureWidth/2.0) + Spread.X,
 		ViewportCenter.Y-(TextureHeight/2.0 + Spread.Y)
 	);
 
-	// DrawTexture:HUDÖĞ±¾Éí¾ÍÓĞµÄº¯Êı
+	// DrawTexture:HUDä¸­æœ¬èº«å°±æœ‰çš„å‡½æ•°
 	DrawTexture
 	(
 		Texture,
@@ -66,7 +76,17 @@ void ABattleHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FV
 		TextureHeight,
 		0,0,
 		1,1,
-		FLinearColor::White
+		CrosshairsColor
 	);
 
+}
+
+void ABattleHUD::AddCharacterOverlay()
+{
+	APlayerController* PlayerController = GetOwningPlayerController();
+	if (PlayerController && CharacterOverlayClass)
+	{
+		CharacterOverlay = CreateWidget<UCharacterOverlay>(PlayerController, CharacterOverlayClass);
+		CharacterOverlay->AddToViewport();
+	}
 }

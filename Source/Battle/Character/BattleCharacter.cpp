@@ -10,10 +10,18 @@
 #include "Battle/BattleComponents/CombatComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Battle/Battle.h"
+#include "Battle/PlayerController/BattlePlayerController.h"
+#include "Battle/GameMode/BattleGameMode.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundCue.h"
+#include "Particles/ParticleSystemComponent.h"
+
 
 ABattleCharacter::ABattleCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	SpawnCollisionHandlingMethod= ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	NetUpdateFrequency=66; // 网络平稳时replicate的频率
 	MinNetUpdateFrequency=33; // 网络波动时replicate的频率
 
@@ -39,9 +47,13 @@ ABattleCharacter::ABattleCharacter()
 	GetCharacterMovement()->NavAgentProps.bCanCrouch=true; //赋予蹲的能力。蓝图中也可以勾选，这里是启用默认值
 	GetCharacterMovement()->RotationRate.Yaw=850; // 转身的速度
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera,ECollisionResponse::ECR_Ignore);
+	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
+	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
 
 	TurningInPlace=ETurningInPlace::ETIP_NotTurning;
+
+	DissolveTimelineComp = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimelineComponent"));
 }
 
 void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -50,6 +62,7 @@ void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 	//DOREPLIFETIME(ABattleCharacter,OverlappingWeapon);
 	DOREPLIFETIME_CONDITION(ABattleCharacter, OverlappingWeapon,COND_OwnerOnly); // 只同步到拥有的客户端（确定了同步给谁）
+	DOREPLIFETIME(ABattleCharacter,Health);
 }
 
 void ABattleCharacter::PostInitializeComponents()
@@ -58,6 +71,16 @@ void ABattleCharacter::PostInitializeComponents()
 	if (CombatComponent)
 	{
 		CombatComponent->BattleCharacter=this;
+	}
+}
+
+void ABattleCharacter::Destroyed()
+{
+	Super::Destroyed();
+
+	if (ElimBotEffectComp)
+	{
+		ElimBotEffectComp->DestroyComponent();
 	}
 }
 
@@ -73,14 +96,34 @@ void ABattleCharacter::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
-	
+
+	UpdateHUDHealth();
+	if (HasAuthority())
+	{
+		OnTakeAnyDamage.AddDynamic(this, &ABattleCharacter::ReceiveDamage);
+	}
 }
 
 void ABattleCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	AimOffset(DeltaTime);
+	if (GetLocalRole() > ENetRole::ROLE_SimulatedProxy && IsLocallyControlled())
+	{// 服务器上或者自主
+		AimOffset(DeltaTime);
+	}
+	else
+	{
+		//SimProxiesTurn(); // 不能在tick中调用，因为tick的频率实际上比网络netfrequence快，所以有些delta值为0
+		TimeSinceLastMovementReplication += DeltaTime;
+		if (TimeSinceLastMovementReplication > 0.25f)
+		{
+			OnRep_ReplicatedMovement();
+		}
+		CalculateAO_Pitch();
+	}
+
+	HideCharacterIfCameraClose();
 }
 
 
@@ -259,13 +302,12 @@ void ABattleCharacter::AimOffset(float DeltaTime)
 {
 	if (CombatComponent==nullptr || CombatComponent->EquippedWeapon==nullptr) return;
 	
-	FVector Velocity = GetVelocity();
-	Velocity.Z = 0;
-	float Speed = Velocity.Size();
+	float Speed = CalculateSpeed();
 	bool bIsInAir = GetCharacterMovement()->IsFalling();
 
 	if (Speed <= 0.1 && !bIsInAir) // standing still
 	{
+		bRotateRootBone=true;
 
 		FRotator CurrentAimRotation= FRotator(0, GetBaseAimRotation().Yaw, 0);
 		FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
@@ -289,6 +331,8 @@ void ABattleCharacter::AimOffset(float DeltaTime)
 	}
 	else if (Speed > 0.1 || bIsInAir) // running or jumping
 	{
+		bRotateRootBone = true;
+
 		StartingAimRotation=FRotator(0,GetBaseAimRotation().Yaw,0);
 		AO_Yaw=0;
 		bUseControllerRotationYaw=true;
@@ -296,20 +340,61 @@ void ABattleCharacter::AimOffset(float DeltaTime)
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 	}
 
-	// 网络传输时会被映射成[0,360],即不允许负数
-	// 0 被作为分界线，0以下从360开始，即取模360
-	// 压缩和解压时格式会有异常
-	AO_Pitch=GetBaseAimRotation().Pitch;  
-	if (AO_Pitch > 90.f && !IsLocallyControlled())
-	{
-		// map pitch from [270,360] to [-90,0]
-		AO_Pitch=UKismetMathLibrary::MapRangeClamped(AO_Pitch,270,360,-90,0);
-	}
+	CalculateAO_Pitch();
 
 	/*
 	* 通过组合这两个条件输出对应的值进行debug
 	if (!HasAuthority() && !IsLocallyControlled())
 	*/
+}
+
+void ABattleCharacter::CalculateAO_Pitch()
+{
+	// 网络传输时会被映射成[0,360],即不允许负数
+	// 0 被作为分界线，0以下从360开始，即取模360
+	// 压缩和解压时格式会有异常
+	AO_Pitch = GetBaseAimRotation().Pitch;
+	if (AO_Pitch > 90.f && !IsLocallyControlled())
+	{
+		// map pitch from [270,360] to [-90,0]
+		AO_Pitch = UKismetMathLibrary::MapRangeClamped(AO_Pitch, 270, 360, -90, 0);
+	}
+}
+
+void ABattleCharacter::SimProxiesTurn()
+{
+	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr) return;
+	bRotateRootBone = false;
+
+	float Speed = CalculateSpeed();
+	if (Speed > 0.f)
+	{
+		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		return;
+	}
+
+	ProxyRotationLastFrame = ProxyRotation;
+	ProxyRotation = GetActorRotation();
+	ProxyYaw = UKismetMathLibrary::NormalizedDeltaRotator(ProxyRotation, ProxyRotationLastFrame).Yaw;
+	// UE_LOG(LogTemp, Warning, TEXT("ProxyYaw: %f"), ProxyYaw);
+
+	if (FMath::Abs(ProxyYaw) > TurnThreshold)
+	{
+		if (ProxyYaw > TurnThreshold)
+		{
+			TurningInPlace = ETurningInPlace::ETIP_Right;
+		}
+		else if (ProxyYaw < -TurnThreshold)
+		{
+			TurningInPlace = ETurningInPlace::ETIP_Left;
+		}
+		else
+		{
+			TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		}
+		return;
+	}
+	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 }
 
 // 转身动画实质上只是播放，并不改变朝向
@@ -338,6 +423,39 @@ void ABattleCharacter::TurnInPlace(float DeltaTime)
 	}
 }
 
+//void ABattleCharacter::MulticastHit_Implementation()
+//{
+//	PlayHitReactMontage();
+//}
+
+void ABattleCharacter::HideCharacterIfCameraClose()
+{
+	if(!IsLocallyControlled()) return;
+
+	if ((FollowCamera->GetComponentLocation() - GetActorLocation()).Size() < CameraThreshold)
+	{
+		GetMesh()->SetVisibility(false);
+		if (CombatComponent && CombatComponent->EquippedWeapon)
+		{
+			CombatComponent->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee=true;
+		}
+	}
+	else
+	{
+		GetMesh()->SetVisibility(true);
+		if (CombatComponent && CombatComponent->EquippedWeapon)
+		{
+			CombatComponent->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = false;
+		}
+	}
+}
+
+void ABattleCharacter::OnRep_Health()
+{
+	UpdateHUDHealth();
+	PlayHitReactMontage();
+}
+
 AWeapon* ABattleCharacter::GetEquippedWeapon()
 {
 	if(CombatComponent==nullptr) return nullptr;
@@ -356,6 +474,171 @@ void ABattleCharacter::PlayFireMontage(bool bAiming)
 		FName SectionName;
 		SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
 		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
+void ABattleCharacter::PlayHitReactMontage()
+{
+	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr) return;
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && HitReactMontage)
+	{
+		AnimInstance->Montage_Play(HitReactMontage);
+		FName SectionName;
+		SectionName = FName("FromFront");
+		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
+FVector ABattleCharacter::GetHitTarget() const
+{
+	if (CombatComponent == nullptr) return FVector();
+
+	return CombatComponent->HitTarget;
+}
+
+void ABattleCharacter::OnRep_ReplicatedMovement()
+{
+	Super::OnRep_ReplicatedMovement();
+	SimProxiesTurn();
+	TimeSinceLastMovementReplication = 0.f;
+}
+
+float ABattleCharacter::CalculateSpeed()
+{
+	FVector Velocity = GetVelocity();
+	Velocity.Z = 0;
+	return Velocity.Size();
+}
+
+void ABattleCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser)
+{
+	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
+
+	// 服务端的反应，在Onrep_health,对客户端进行同样的设置
+	UpdateHUDHealth();
+	PlayHitReactMontage();
+
+	if (Health <= 0.1f)
+	{
+		ABattleGameMode* BlasterGameMode = GetWorld()->GetAuthGameMode<ABattleGameMode>();
+		if (BlasterGameMode)
+		{
+			BattlePlayerController = BattlePlayerController == nullptr ? Cast<ABattlePlayerController>(Controller) : BattlePlayerController;
+			ABattlePlayerController* AttackerController = Cast<ABattlePlayerController>(InstigatorController);
+			BlasterGameMode->PlayerEliminated(this, BattlePlayerController, AttackerController);
+		}
+	}
+}
+
+void ABattleCharacter::UpdateHUDHealth()
+{
+	BattlePlayerController = BattlePlayerController == nullptr ? Cast<ABattlePlayerController>(GetController()) : BattlePlayerController;
+	if (BattlePlayerController)
+	{
+		BattlePlayerController->SetHUDHealth(Health, MaxHealth);
+	}
+}
+
+void ABattleCharacter::Elim()
+{
+	if (CombatComponent && CombatComponent->EquippedWeapon)
+	{
+		CombatComponent->EquippedWeapon->Dropped();
+	}
+
+	MulticastElim();
+	GetWorldTimerManager().SetTimer(
+		ElimTimer,
+		this,
+		&ABattleCharacter::ElimTimerFinished,
+		ElimDelayTime);
+}
+
+void ABattleCharacter::MulticastElim_Implementation()
+{
+	bElimmed=true;
+	PlayElimMontage();
+	
+	// Start Dissolve effect 
+	if (DissolveMaterialInstance)
+	{
+		DynamicDissolveMaterialInstance = UMaterialInstanceDynamic::Create(DissolveMaterialInstance, this);
+		GetMesh()->SetMaterial(0, DynamicDissolveMaterialInstance);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), 0.55f);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Glow"), 200.f);
+	}
+	StartDissolve();
+
+	// Disable Movement
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+
+	// Disable Input
+	if (BattlePlayerController)
+	{
+		DisableInput(BattlePlayerController);
+	}
+
+	// Disable Collision
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// Spawn Elim Bot
+	if (ElimBotEffect)
+	{
+		FVector ElimBotSpawnPoint(GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z + 200.f);
+		ElimBotEffectComp = UGameplayStatics::SpawnEmitterAtLocation(
+			GetWorld(),
+			ElimBotEffect,
+			ElimBotSpawnPoint,
+			GetActorRotation()
+		);
+	}
+	if (ElimBotSound)
+	{
+		UGameplayStatics::SpawnSoundAtLocation(
+			this,
+			ElimBotSound,
+			GetActorLocation()
+		);
+	}
+}
+
+void ABattleCharacter::PlayElimMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ElimMontage)
+	{
+		AnimInstance->Montage_Play(ElimMontage);
+	}
+}
+
+void ABattleCharacter::ElimTimerFinished()
+{
+	ABattleGameMode* BlasterGameMode = GetWorld()->GetAuthGameMode<ABattleGameMode>();
+	if (BlasterGameMode)
+	{
+		BlasterGameMode->RequestRespawn(this,GetController());
+	}
+}
+
+void ABattleCharacter::UpdateDissolveMaterial(float DissolveValue)
+{
+	if (DynamicDissolveMaterialInstance)
+	{
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), DissolveValue);
+	}
+}
+
+void ABattleCharacter::StartDissolve()
+{
+	DissolveTrack.BindDynamic(this, &ABattleCharacter::UpdateDissolveMaterial);
+	if (DissolveCurve && DissolveTimelineComp)
+	{
+		DissolveTimelineComp->AddInterpFloat(DissolveCurve, DissolveTrack);
+		DissolveTimelineComp->Play();
 	}
 }
 

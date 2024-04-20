@@ -10,7 +10,7 @@ void AProjectileWeapon::Fire(const FVector& HitTarget)
 {
 	Super::Fire(HitTarget);
 
-	// 只有服务器能射击
+	// 鍙湁鏈嶅姟鍣ㄨ兘灏勫嚮
 	if(!HasAuthority()) return;
 
 
@@ -22,7 +22,7 @@ void AProjectileWeapon::Fire(const FVector& HitTarget)
 		if (ProjectileClass)
 		{
 			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner=GetOwner();
+			SpawnParams.Owner=GetOwner(); // 鍦ㄧ帺瀹舵嬀鍙栨椂璁剧疆浜唎wner
 			SpawnParams.Instigator=Cast<APawn>(GetOwner());
 
 			UWorld* World=GetWorld();

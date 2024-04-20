@@ -77,4 +77,30 @@ public:
 	class UTexture2D* CrosshairsTop;
 	UPROPERTY(EditAnywhere, Category = "Crosshairs")
 	class UTexture2D* CrosshairsBottom;
+
+public:
+	/* Zoom FOV while aiming */
+	UPROPERTY(EditAnywhere)
+	float ZoomedFOV = 30.f;
+
+	UPROPERTY(EditAnywhere)
+	float ZoomInterpSpeed=20.f;
+
+	FORCEINLINE float GetZoomedFOV() const{return ZoomedFOV;}
+	FORCEINLINE float GetZoomInterpSpeed() const { return ZoomInterpSpeed; }
+
+	/**
+	* Automatic fire
+	*/
+	UPROPERTY(EditAnywhere, Category = Combat)
+	float FireDelay = .15f;
+
+	UPROPERTY(EditAnywhere, Category = Combat)
+	bool bAutomatic = true;
+
+	/*
+	*  Dropped
+	*/
+	void Dropped();
+
 };

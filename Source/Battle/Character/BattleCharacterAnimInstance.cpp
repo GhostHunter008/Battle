@@ -63,7 +63,7 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	AO_Yaw=BattleCharacter->GetAOYaw();
 	AO_Pitch=BattleCharacter->GetAOPitch();
 
-	//IK
+	// HandsTransform : IK 和 武器旋转修正
 	if (bWeaponEquipped && EquippedWeapon && EquippedWeapon->GetWeaponMesh() && BattleCharacter->GetMesh())
 	{
 		LeftHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket")); // 获取的是LeftHandSocket世界空间位置
@@ -73,8 +73,29 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 		BattleCharacter->GetMesh()->TransformToBoneSpace(FName("hand_r"),LeftHandTransform.GetLocation(), FRotator::ZeroRotator, OutPosition,OutRotation); 
 		LeftHandTransform.SetLocation(OutPosition);
 		LeftHandTransform.SetRotation(FQuat(OutRotation));
+
+		if (BattleCharacter->IsLocallyControlled())
+		{
+			bLocallyControlled=true;
+			//FTransform RightHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("hand_r"));
+			FTransform RightHandTransform = BattleCharacter->GetMesh()->GetSocketTransform(FName("hand_r"));
+			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - BattleCharacter->GetHitTarget()));
+			RightHandRotation = FMath::RInterpTo(RightHandRotation,LookAtRotation,DeltaTime,30);
+			
+			//// Debug
+			//// 从枪口发出的射线
+			//FTransform MuzzleTipTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("MuzzleFlash"), ERelativeTransformSpace::RTS_World);
+			//FVector MuzzleX = FRotationMatrix(MuzzleTipTransform.GetRotation().Rotator()).GetUnitAxis(EAxis::X);
+			//DrawDebugLine(GetWorld(), MuzzleTipTransform.GetLocation(), MuzzleTipTransform.GetLocation() + MuzzleX * 1000.f, FColor::Red);
+			//// 从枪口到目标点（准星决定）的射线
+			//DrawDebugLine(GetWorld(), MuzzleTipTransform.GetLocation(), BattleCharacter->GetHitTarget(), FColor::Orange);
+		}
 	}
 
 	// TurningInPlace
 	TurningInPlace=BattleCharacter->GetTurningInPlace();
+
+	bRotateRootBone = BattleCharacter->ShouldRotateRootBone();
+
+	bElimmed=BattleCharacter->IsElimmed();
 }

@@ -10,6 +10,7 @@
 #include "DrawDebugHelpers.h"
 #include "Battle/PlayerController/BattlePlayerController.h"
 #include "Battle//HUD/BattleHUD.h"
+#include "Camera/CameraComponent.h"
 
 
 
@@ -36,6 +37,12 @@ void UCombatComponent::BeginPlay()
 	if (BattleCharacter)
 	{
 		BattleCharacter->GetCharacterMovement()->MaxWalkSpeed=BaseWalkSpeed;
+
+		if (UCameraComponent* FollowCamera = BattleCharacter->GetFollowCamera())
+		{
+			DefaultFOV=FollowCamera->FieldOfView;
+			CurrentFOV=DefaultFOV;
+		}
 	}
 }
 
@@ -43,7 +50,19 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	SetHUDCrosshairs(DeltaTime);
+	if (BattleCharacter && BattleCharacter->IsLocallyControlled())
+	{
+		// 准星扩散
+		SetHUDCrosshairs(DeltaTime);
+		
+		// 为了设置武器旋转
+		FHitResult HitResult;
+		TraceUnderCrosshairs(HitResult);
+		HitTarget = HitResult.ImpactPoint;
+
+		// 瞄准视野变换
+		InterpFOV(DeltaTime);
+	}
 }
 
 void UCombatComponent::SetAiming(bool InbAiming)
@@ -72,6 +91,13 @@ void UCombatComponent::OnRep_EquippedWeapon()
 {
 	if (EquippedWeapon && BattleCharacter)
 	{
+		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+		const USkeletalMeshSocket* HandSocket = BattleCharacter->GetMesh()->GetSocketByName(FName("RightHandSocket"));
+		if (HandSocket)
+		{
+			HandSocket->AttachActor(EquippedWeapon, BattleCharacter->GetMesh());
+		}
+
 		// 由controller接管旋转
 		BattleCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
 		BattleCharacter->bUseControllerRotationYaw = true;
@@ -80,17 +106,47 @@ void UCombatComponent::OnRep_EquippedWeapon()
 
 void UCombatComponent::FireButtonPress(bool bPressed)
 {
-	FireButtonPressed=bPressed;
+	bFireButtonPressed=bPressed;
 
-	if (FireButtonPressed)
+	if (bFireButtonPressed && EquippedWeapon)
 	{
-		FHitResult HitResult;
-		TraceUnderCrosshairs(HitResult);
-
-		ServerFire(HitResult.ImpactPoint);
-		
+		Fire();
 	}
-	
+}
+
+void UCombatComponent::Fire()
+{
+	if (bCanFire)
+	{
+		bCanFire = false;
+		ServerFire(HitTarget);
+		if (EquippedWeapon)
+		{
+			CrosshairShootingFactor = .75f;
+		}
+		StartFireTimer();
+	}
+}
+
+void UCombatComponent::StartFireTimer()
+{
+	if (EquippedWeapon == nullptr || BattleCharacter == nullptr) return;
+	BattleCharacter->GetWorldTimerManager().SetTimer(
+		FireTimer,
+		this,
+		&UCombatComponent::FireTimerFinished,
+		EquippedWeapon->FireDelay
+	);
+}
+
+void UCombatComponent::FireTimerFinished()
+{
+	if (EquippedWeapon == nullptr) return;
+	bCanFire = true;
+	if (bFireButtonPressed && EquippedWeapon->bAutomatic)
+	{
+		Fire();
+	}
 }
 
 void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
@@ -129,6 +185,12 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 	if (bScreenToWorld)
 	{
 		FVector Start = CrosshairWorldPosition;
+		// 此处对检测的起点位置进行前移，能有效防止检测到自身和检测到背后物体的情况发生
+		if (BattleCharacter)
+		{
+			float DistanceToCharacter = (BattleCharacter->GetActorLocation()-Start).Size();
+			Start+= CrosshairWorldDirection*(DistanceToCharacter+100.f);
+		}
 		FVector End= Start + CrosshairWorldDirection * TRACE_LENGTH;
 		GetWorld()->LineTraceSingleByChannel
 		(
@@ -142,12 +204,22 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		{
 			TraceHitResult.ImpactPoint=End;
 		}
-		//DrawDebugSphere(GetWorld(),TraceHitResult.ImpactPoint,12,12,FColor::Red);
+		//else
+		//{
+		//	DrawDebugSphere(GetWorld(), TraceHitResult.ImpactPoint, 12, 12, FColor::Red,false,2);
+		//}
+
+		if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairInterface>())
+		{
+			HUDPackage.CrosshairsColor=FLinearColor::Red;
+		}
+		else
+		{
+			HUDPackage.CrosshairsColor = FLinearColor::White;
+		}
 	}
 
 }
-
-
 
 void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 {
@@ -159,7 +231,6 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 		BattleHUD = BattleHUD==nullptr ? Cast<ABattleHUD>(BattleController->GetHUD()) : BattleHUD;
 		if (BattleHUD)
 		{
-			FHUDPackage HUDPackage;
 			if (EquippedWeapon)
 			{
 				HUDPackage.CrosshairsCenter = EquippedWeapon->CrosshairsCenter;
@@ -187,22 +258,55 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 			CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(WalkSpeedRange,VelocityMultiplierRange,Velocity.Size());
 
 			// 是否在空中，如跳跃、坠落等
+			// 范围 【0，2.25】
 			if (BattleCharacter->GetCharacterMovement()->IsFalling())
 			{
 				CrosshairInAirFactor=FMath::FInterpTo(CrosshairInAirFactor,2.25,DeltaTime,2.25);
 			}
 			else
 			{
-				CrosshairInAirFactor = FMath::FInterpTo(CrosshairInAirFactor, 0, DeltaTime, 30);
+				CrosshairInAirFactor = FMath::FInterpTo(CrosshairInAirFactor, 0.f, DeltaTime, 30.f);
 			}
 
+			// 是否瞄准，注意此处是正值，最后需要减去
+			if (bAiming)
+			{
+				CrosshairAimFactor= FMath::FInterpTo(CrosshairAimFactor,0.58f,DeltaTime,30.f);
+			}
+			else
+			{
+				CrosshairAimFactor = FMath::FInterpTo(CrosshairAimFactor, 0.f, DeltaTime, 30.f);
+			}
 
+			CrosshairShootingFactor= FMath::FInterpTo(CrosshairShootingFactor, 0.f, DeltaTime, 30.f);
 
-			HUDPackage.CrosshairSpread=CrosshairVelocityFactor + CrosshairInAirFactor;
+			HUDPackage.CrosshairSpread=0.5+CrosshairVelocityFactor + CrosshairInAirFactor-CrosshairAimFactor+CrosshairShootingFactor;
 			BattleHUD->SetHUDPackage(HUDPackage);
 		}
 	}
 }
+
+void UCombatComponent::InterpFOV(float DeltaTime)
+{
+	if(EquippedWeapon==nullptr) return;
+
+	if (bAiming)
+	{
+		CurrentFOV = FMath::FInterpTo(CurrentFOV,EquippedWeapon->GetZoomedFOV(),DeltaTime,EquippedWeapon->GetZoomInterpSpeed());
+	}
+	else
+	{
+		CurrentFOV = FMath::FInterpTo(CurrentFOV, DefaultFOV, DeltaTime, ZoomInterpSpeed);
+	}
+
+	if (BattleCharacter)
+	{
+		UCameraComponent* FollowCamera=BattleCharacter->GetFollowCamera();
+		FollowCamera->SetFieldOfView(CurrentFOV);
+	}
+}
+
+
 
 void UCombatComponent::EquipWeapon(class AWeapon* InWeapon)
 {

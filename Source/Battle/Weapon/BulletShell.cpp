@@ -8,11 +8,13 @@ ABulletShell::ABulletShell()
 
 	ShellMesh=CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShellMesh"));
 	SetRootComponent(ShellMesh);
-	ShellMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera,ECollisionResponse::ECR_Ignore);
+	ShellMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera,ECollisionResponse::ECR_Ignore); // 避免子弹和相机产生阻挡
 	ShellMesh->SetSimulatePhysics(true);
 	ShellMesh->SetEnableGravity(true);
-	ShellMesh->SetNotifyRigidBodyCollision(true); // blueprint:simulate generate hit event
+	ShellMesh->SetNotifyRigidBodyCollision(true); // 对应blueprint:simulate generate hit event
 	ShellEjectionImpulse=5;
+
+	//SetLifeSpan(3);
 }
 
 void ABulletShell::BeginPlay()
