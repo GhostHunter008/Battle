@@ -6,6 +6,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Battle/Weapon/Weapon.h"
+#include "Battle/BattleTypes/CombatStates.h"
 
 void UBattleCharacterAnimInstance::NativeInitializeAnimation()
 {
@@ -98,4 +99,8 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	bRotateRootBone = BattleCharacter->ShouldRotateRootBone();
 
 	bElimmed=BattleCharacter->IsElimmed();
+
+	bUseFABRIK= BattleCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bUseAimOffset= BattleCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bTransformRightHand = BattleCharacter->GetCombatState() != ECombatState::ECS_Reloading;
 }

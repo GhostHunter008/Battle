@@ -9,7 +9,7 @@ void ABattleHUD::BeginPlay()
 {
 	Super::BeginPlay();
 
-	AddCharacterOverlay();
+	//AddCharacterOverlay();
 
 }
 

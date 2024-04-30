@@ -7,7 +7,8 @@
 #include "Animation/AnimationAsset.h"
 #include "BulletShell.h"
 #include "Engine/SkeletalMeshSocket.h"
-
+#include "Battle/Character/BattleCharacter.h"
+#include "Battle/PlayerController/BattlePlayerController.h"
 
 
 AWeapon::AWeapon()
@@ -60,6 +61,7 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AWeapon, WeaponState);
+	DOREPLIFETIME(AWeapon, Ammo);
 }
 
 void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -110,6 +112,63 @@ void AWeapon::Dropped()
 	WeaponMesh->DetachFromComponent(DetachmentTransformRules);
 
 	SetOwner(nullptr);
+	BattleOwnerCharacter=nullptr;
+	BattleOwnerPlayerController=nullptr;
+}
+
+
+void AWeapon::SetupHUDAmmo()
+{
+	BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(GetOwner()) : BattleOwnerCharacter;
+	if (BattleOwnerCharacter)
+	{
+		BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(BattleOwnerCharacter->GetController()) : BattleOwnerPlayerController;
+		if (BattleOwnerPlayerController)
+		{
+			BattleOwnerPlayerController->SetHUDWeaponAmmo(Ammo);
+		}
+	}
+}
+
+void AWeapon::AddAmmo(int32 AddAmmo)
+{
+	Ammo = FMath::Clamp(Ammo+AddAmmo,0,MagCapacity);
+
+	SetupHUDAmmo();
+}
+
+void AWeapon::SpendRound()
+{
+	Ammo=FMath::Clamp(Ammo-1,0,MagCapacity);
+
+	SetupHUDAmmo();
+}
+
+void AWeapon::OnRep_Owner()
+{
+	Super::OnRep_Owner();
+
+	if (Owner == nullptr)
+	{
+		BattleOwnerCharacter = nullptr;
+		BattleOwnerPlayerController = nullptr;
+	}
+	else
+	{
+		SetupHUDAmmo();
+	}
+}
+
+	
+
+bool AWeapon::IsEmpty()
+{
+	return Ammo <= 0; 
+}
+
+void AWeapon::OnRep_Ammo()
+{
+	SetupHUDAmmo();
 }
 
 void AWeapon::ShowPickupWidget(bool bShowWidget)
@@ -174,5 +233,7 @@ void AWeapon::Fire(const FVector& HitTarget)
 			}
 		}
 	}
+
+	SpendRound();
 }
 

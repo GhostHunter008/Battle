@@ -6,6 +6,7 @@
 #include "Battle/BattleTypes/TurningInPlace.h"
 #include "Battle/Interfaces/InteractWithCrosshairInterface.h"
 #include "Components/TimelineComponent.h"
+#include "Battle/BattleTypes/CombatStates.h"
 #include "BattleCharacter.generated.h"
 
 
@@ -39,6 +40,7 @@ protected:
 	void AimButtonRelease(const FInputActionValue& Value);
 	void FireButtonPress(const FInputActionValue& Value);
 	void FireButtonRelease(const FInputActionValue& Value);
+	void ReloadButtonPress(const FInputActionValue& Value);
 
 private:
 	UPROPERTY(VisibleAnywhere,Category=Camera)
@@ -62,6 +64,8 @@ private:
 	class UInputAction* AimAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* FireAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* ReloadAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
 	class UWidgetComponent* OverheadWidget; // 用于在人物上方显示信息
@@ -71,7 +75,7 @@ private:
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class UCombatComponent* CombatComponent;
 
 	class ABattlePlayerController* BattlePlayerController;
@@ -120,6 +124,7 @@ public:
 	FORCEINLINE ETurningInPlace GetTurningInPlace()const {return TurningInPlace;}
 	void PlayFireMontage(bool bAiming);
 	void PlayHitReactMontage();
+	void PlayReloadMontage();
 	//UFUNCTION(NetMulticast, Unreliable) // 通过health的rep函数走，不再用RPC
 	//void MulticastHit();
 	FVector GetHitTarget() const;
@@ -201,6 +206,21 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = Elim)
 	class USoundCue* ElimBotSound;
+
+	// poll for any related class to init our hud
+	void PollInit();
+
+	class ABattlePlayerState* BattlePlayerState;
+
+
+	UPROPERTY(EditAnywhere, Category = Combat)
+	UAnimMontage* ReloadMontage;
+
+	/*
+	* Reload
+	*/
+	ECombatState GetCombatState() const;
+
 
 
 

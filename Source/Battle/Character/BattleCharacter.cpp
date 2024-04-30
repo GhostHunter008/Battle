@@ -16,6 +16,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "Battle/PlayerState/BattlePlayerState.h"
+#include "Battle/Weapon/WeaponTypes.h"
 
 
 ABattleCharacter::ABattleCharacter()
@@ -124,6 +126,8 @@ void ABattleCharacter::Tick(float DeltaTime)
 	}
 
 	HideCharacterIfCameraClose();
+
+	PollInit(); // 轮询 因为第一帧中playerstate无效
 }
 
 
@@ -144,6 +148,7 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Completed, this, &ABattleCharacter::AimButtonRelease);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ABattleCharacter::FireButtonPress);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ABattleCharacter::FireButtonRelease);
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ABattleCharacter::ReloadButtonPress);
 	}
 }
 
@@ -162,6 +167,8 @@ void ABattleCharacter::Move(const FInputActionValue& Value)
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
 	}
+
+	GEngine->AddOnScreenDebugMessage(-1,2,FColor::Red,TEXT("MOVE"));
 }
 
 void ABattleCharacter::Look(const FInputActionValue& Value)
@@ -256,6 +263,14 @@ void ABattleCharacter::FireButtonRelease(const FInputActionValue& Value)
 		CombatComponent->FireButtonPress(false);
 	}
 }
+
+void ABattleCharacter::ReloadButtonPress(const FInputActionValue& Value)
+{
+	if (CombatComponent)
+	{
+		CombatComponent->Reload();
+	}
+}	
 
 void ABattleCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon) // 确定了接收到Rep的行为
 {
@@ -491,6 +506,30 @@ void ABattleCharacter::PlayHitReactMontage()
 	}
 }
 
+void ABattleCharacter::PlayReloadMontage()
+{
+	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr) return;
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ReloadMontage)
+	{
+		AnimInstance->Montage_Play(ReloadMontage);
+		FName SectionName;
+
+		switch (CombatComponent->EquippedWeapon->GetWeaponType())
+		{
+			case EWeaponType::EWT_AssaultRifle:
+			{
+				SectionName = FName("Rifle");
+				break;
+			}
+
+		}
+		
+		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
 FVector ABattleCharacter::GetHitTarget() const
 {
 	if (CombatComponent == nullptr) return FVector();
@@ -604,6 +643,12 @@ void ABattleCharacter::MulticastElim_Implementation()
 			GetActorLocation()
 		);
 	}
+
+	// 清空子弹数量
+	if (BattlePlayerController)
+	{
+		BattlePlayerController->SetHUDWeaponAmmo(0);
+	}
 }
 
 void ABattleCharacter::PlayElimMontage()
@@ -640,5 +685,24 @@ void ABattleCharacter::StartDissolve()
 		DissolveTimelineComp->AddInterpFloat(DissolveCurve, DissolveTrack);
 		DissolveTimelineComp->Play();
 	}
+}
+
+void ABattleCharacter::PollInit()
+{
+	if (BattlePlayerState==nullptr)
+	{
+		BattlePlayerState=GetPlayerState<ABattlePlayerState>();
+		if (BattlePlayerState)
+		{
+			BattlePlayerState->AddToScore(0);
+			BattlePlayerState->AddToDefeats(0);
+		}
+	}
+}
+
+ECombatState ABattleCharacter::GetCombatState() const
+{
+	if (CombatComponent == nullptr) return ECombatState::ECS_MAX;
+	return CombatComponent->CombatState;
 }
 

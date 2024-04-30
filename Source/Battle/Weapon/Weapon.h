@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Battle/Weapon/WeaponTypes.h"
 #include "Weapon.generated.h"
 
 UENUM()
@@ -63,6 +64,10 @@ private:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class ABulletShell> BulletShellClass;
 
+
+	class ABattleCharacter* BattleOwnerCharacter=nullptr;
+	class ABattlePlayerController* BattleOwnerPlayerController=nullptr;
+
 public:
 	/*
 	* Texture for the weapon crosshairs
@@ -98,9 +103,44 @@ public:
 	UPROPERTY(EditAnywhere, Category = Combat)
 	bool bAutomatic = true;
 
+	UPROPERTY(EditAnywhere)
+	class USoundCue* EquipSound;
+
 	/*
 	*  Dropped
 	*/
 	void Dropped();
+
+
+	/*
+	* 弹药
+	*/
+	UPROPERTY(EditAnywhere)
+	int32 MagCapacity; // 枪中的容量
+	 
+	UPROPERTY(EditAnywhere,ReplicatedUsing=OnRep_Ammo)
+	int32 Ammo; // 枪中的子弹
+
+	UFUNCTION()
+	void OnRep_Ammo();
+
+	void SpendRound(); // 减少弹药的操作应该只在服务器调用
+
+	void SetupHUDAmmo();
+
+	void AddAmmo(int32 AddAmmo);
+
+	virtual void OnRep_Owner() override;
+
+	bool IsEmpty();
+
+	UPROPERTY(EditAnywhere)
+	EWeaponType WeaponType;
+	FORCEINLINE EWeaponType GetWeaponType() { return WeaponType; }
+
+	FORCEINLINE int32 GetAmmo(){return Ammo;}
+	FORCEINLINE int32 GetMagCapacity() { return MagCapacity; }
+
+
 
 };

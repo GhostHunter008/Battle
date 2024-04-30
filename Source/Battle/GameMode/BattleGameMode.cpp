@@ -6,9 +6,48 @@
 #include "Battle/PlayerController/BattlePlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
+#include "Battle/PlayerState/BattlePlayerState.h"
+
+ABattleGameMode::ABattleGameMode()
+{
+	bDelayedStart=true; // match state åœç•™åœ¨Waiting start çš„çŠ¶æ€ï¼Œæ­¤æ—¶default pawnå°šæœªç”Ÿæˆï¼Œç©å®¶å¯ä»¥åœ¨åœ°å›¾ä¸­é£è¡Œ
+}
+
+void ABattleGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	LevelStartingTime = GetWorld()->GetTimeSeconds();
+}
+
+void ABattleGameMode::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (MatchState == MatchState::WaitingToStart)
+	{
+		CountdownTime = WarmupTime - GetWorld()->GetTimeSeconds() + LevelStartingTime;
+		if (CountdownTime <= 0.f)
+		{
+			StartMatch();
+		}
+	}
+}
 
 void ABattleGameMode::PlayerEliminated(class ABattleCharacter* ElimmedCharacter, class ABattlePlayerController* VictimController, ABattlePlayerController* AttackerController)
 {
+	ABattlePlayerState* AttackerPlayerState = AttackerController ? Cast<ABattlePlayerState>(AttackerController->PlayerState) : nullptr;
+	ABattlePlayerState* VictimPlayerState = VictimController ? Cast<ABattlePlayerState>(VictimController->PlayerState) : nullptr;
+
+	if (AttackerPlayerState && AttackerPlayerState != VictimPlayerState)
+	{
+		AttackerPlayerState->AddToScore(5);
+	}
+	if (VictimPlayerState)
+	{
+		VictimPlayerState->AddToDefeats(1);
+	}
+
 	if (ElimmedCharacter)
 	{
 		ElimmedCharacter->Elim();
@@ -19,15 +58,29 @@ void ABattleGameMode::RequestRespawn(ACharacter* ElimmedCharacter, AController* 
 {
 	if (ElimmedCharacter)
 	{
-		ElimmedCharacter->Reset(); // ½«controllerºÍpawn·ÖÀë
-		ElimmedCharacter->Destroy(); // Ïú»Ù×Ô¶¯Í¬²½ÖÁ¿Í»§¶Ë
+		ElimmedCharacter->Reset(); // å°†controllerå’Œpawnåˆ†ç¦»
+		ElimmedCharacter->Destroy(); // é”€æ¯è‡ªåŠ¨åŒæ­¥è‡³å®¢æˆ·ç«¯
 	}
 	if (ElimmedController)
 	{
-		// Ëæ¼´ÔÚ³öÉúµãÑ¡ÔñÒ»¸öÎ»ÖÃ
+		// éšå³åœ¨å‡ºç”Ÿç‚¹é€‰æ‹©ä¸€ä¸ªä½ç½®
 		TArray<AActor*> PlayerStarts;
 		UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(), PlayerStarts);
 		int32 Selection = FMath::RandRange(0, PlayerStarts.Num() - 1);
 		RestartPlayerAtPlayerStart(ElimmedController, PlayerStarts[Selection]);
+	}
+}
+
+void ABattleGameMode::OnMatchStateSet()
+{
+	Super::OnMatchStateSet();
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ABattlePlayerController* BattlePlayer = Cast<ABattlePlayerController>(*It);
+		if (BattlePlayer)
+		{
+			BattlePlayer->OnMatchStateSet(MatchState);
+		}
 	}
 }

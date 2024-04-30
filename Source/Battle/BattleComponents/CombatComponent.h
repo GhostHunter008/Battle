@@ -2,6 +2,8 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Battle/HUD/BattleHUD.h"
+#include "Battle/Weapon/WeaponTypes.h"
+#include "Battle/BattleTypes/CombatStates.h"
 #include "CombatComponent.generated.h"
 
 #define TRACE_LENGTH 80000;
@@ -12,58 +14,103 @@ class BATTLE_API UCombatComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
+/************************************************************************/
+/*  组件自身属性相关
+/************************************************************************/
 public:	
 	friend class ABattleCharacter; // 强关联性
 	UCombatComponent();
+	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
 
-	void EquipWeapon(class AWeapon* InWeapon);
-
-protected:
-	virtual void BeginPlay() override;
-
-	void SetAiming(bool InbAiming);
-	UFUNCTION(Server,Reliable)
-	void ServerSetAiming(bool InbAiming);
+	UPROPERTY(ReplicatedUsing = OnRep_CombatState)
+	ECombatState CombatState = ECombatState::ECS_Unoccupied;
 
 	UFUNCTION()
-	void OnRep_EquippedWeapon();
-
-	void FireButtonPress(bool bPressed);
-
-	void Fire();
-
-	UFUNCTION(Server,Reliable)
-	void ServerFire(const FVector_NetQuantize& TraceHitTarget); // FVector_NetQuantize 网络传输优化的结构体
-
-	UFUNCTION(NetMulticast,Reliable)
-	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
-
-	// 以十字准线为基准，进行射线检测
-	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
-
-	// 设置扩散准星
-	void SetHUDCrosshairs(float DeltaTime);
+	void OnRep_CombatState();
 
 private:
 	class ABattleCharacter* BattleCharacter;
 	class ABattlePlayerController* BattleController;
 	class ABattleHUD* BattleHUD;
+	
+/************************************************************************/
+/* 装备武器                                                    
+/************************************************************************/
+public:
+	void EquipWeapon(class AWeapon* InWeapon);
 
-	UPROPERTY(ReplicatedUsing=OnRep_EquippedWeapon)
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
+
+	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	class AWeapon* EquippedWeapon;
+
+/************************************************************************/
+/* 瞄准                                                 
+/************************************************************************/
+
+	void SetAiming(bool InbAiming);
+	UFUNCTION(Server,Reliable)
+	void ServerSetAiming(bool InbAiming);
 
 	UPROPERTY(Replicated)
 	bool bAiming;
+
+	// 以十字准线为基准，进行射线检测
+	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
+
+	// 武器旋转矫正时会用到
+	FVector HitTarget;
 
 	UPROPERTY(EditAnywhere)
 	float BaseWalkSpeed;
 	UPROPERTY(EditAnywhere)
 	float AimWalkSpeed;
 
+	// Aiming and FOV
+	float DefaultFOV; // 由玩家初始的相机FOV决定
+	float CurrentFOV; // 当前视野
+
+	UPROPERTY(EditAnywhere, Category = Combat)
+	float ZoomInterpSpeed = 20.f; // 玩家收枪后视野变化速度，无论什么枪都是一样的；开枪的速度由武器决定
+
+	void InterpFOV(float DeltaTime);
+
+
+/************************************************************************/
+/* 开火                                                            
+/************************************************************************/
+	void FireButtonPress(bool bPressed);
+
 	bool bFireButtonPressed;
+
+	void Fire();
+
+	UFUNCTION(Server, Reliable)
+	void ServerFire(const FVector_NetQuantize& TraceHitTarget); // FVector_NetQuantize 网络传输优化的结构体
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
+
+	// Auto Fire
+	FTimerHandle FireTimer;
+	bool bCanFire = true;
+
+	void StartFireTimer();
+	void FireTimerFinished();
+
+	bool CanFire();
+
+/************************************************************************/
+/* 准星扩散
+/************************************************************************/
+
+	// 设置扩散准星
+	void SetHUDCrosshairs(float DeltaTime);
+
+	FHUDPackage HUDPackage;
 
 	// hud and crosshairs
 	float CrosshairVelocityFactor;
@@ -71,33 +118,43 @@ private:
 	float CrosshairAimFactor;
 	float CrosshairShootingFactor;
 
-	// 武器旋转矫正时会用到
-	FVector HitTarget;
+/************************************************************************/
+/* 更换弹夹
+/************************************************************************/
+public:
+	void Reload();
 
-	FHUDPackage HUDPackage;
+	UFUNCTION(Server, Reliable)
+	void ServerReload();
 
-	/*
-	*  Aiming and FOV
-	*/
+	void HandleReload(); // 服务器和客户端上相同的处理逻辑
 
-	float DefaultFOV; // 由玩家初始的相机FOV决定
+	UFUNCTION(BlueprintCallable)
+	void FinishReloading();
 
-	float CurrentFOV; // 当前视野
-	
-	UPROPERTY(EditAnywhere,Category=Combat)
-	float ZoomedFOV=30.f; 
+	int32 AmountToReload(); // 计算换弹时需要填充多少子弹
 
-	UPROPERTY(EditAnywhere, Category = Combat)
-	float ZoomInterpSpeed = 20.f; // 玩家收枪后视野变化速度，无论什么枪都是一样的
-	
-	void InterpFOV(float DeltaTime);
+	void UpdateAmmoValues(); // 更新墙内子弹和携带的子弹数量（HUD）
 
-	/*Auto Fire*/
-	FTimerHandle FireTimer;
-	bool bCanFire = true;
+	// 当前武器类型的所携带的弹药数量，根据EWeaponType决定
+	UPROPERTY(ReplicatedUsing = OnRep_CarriedAmmo)
+	int32 CarriedAmmo;
 
-	void StartFireTimer();
-	void FireTimerFinished();
+	UFUNCTION()
+	void OnRep_CarriedAmmo();
 
-		
+	TMap<EWeaponType, int32> CarriedAmmoMap;  // 注意Tmap类型无法复制,因为服务器和客户端产生哈希值不一定相同
+
+	void InitializeCarriedAmmo();
+
+	UPROPERTY(EditAnywhere)
+	int32 StartingARAmmo = 30;
+
+
+
+
+
+
+
+
 };
