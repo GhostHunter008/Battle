@@ -9,12 +9,18 @@
 #include "Battle/Character/BattleCharacter.h"
 #include "Battle/GameMode/BattleGameMode.h"
 #include "Net/UnrealNetwork.h"
+#include "Battle/HUD/Announcement.h"
+#include "Kismet/GameplayStatics.h"
+#include "Battle/BattleComponents/CombatComponent.h"
+#include "Battle/GameState/BattleGameState.h"
+#include "Battle/PlayerState/BattlePlayerState.h"
 
 void ABattlePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
 	BattleHUD=Cast<ABattleHUD>(GetHUD());
+	ServerCheckMatchState();
 }
 
 void ABattlePlayerController::OnPossess(APawn* InPawn)
@@ -138,6 +144,51 @@ void ABattlePlayerController::SetHUDCarryAmmo(int32 Ammo)
 	}
 }
 
+void ABattlePlayerController::SetHUDTime()
+{
+	float TimeLeft = 0.f;
+	if (MatchState == MatchState::WaitingToStart) 
+	{
+		TimeLeft = WarmupTime - GetServerTime() + LevelStartingTime;
+	}
+	else if (MatchState == MatchState::InProgress)
+	{
+		TimeLeft = WarmupTime + MatchTime - GetServerTime() + LevelStartingTime;
+	}
+	else if(MatchState == MatchState::Cooldown)
+	{
+		TimeLeft = CooldownTime + WarmupTime + MatchTime - GetServerTime() + LevelStartingTime;
+	}
+	uint32 SecondsLeft = FMath::CeilToInt(TimeLeft);
+
+	if (HasAuthority())
+	{
+		BattleGameMode=BattleGameMode==nullptr?Cast<ABattleGameMode>(UGameplayStatics::GetGameMode(GetWorld())) : BattleGameMode;
+		if (BattleGameMode)
+		{
+			SecondsLeft = FMath::CeilToInt(BattleGameMode->GetCountdownTime()) + LevelStartingTime;
+			//GEngine->AddOnScreenDebugMessage(-1,1,FColor::Red, FString::Printf(TEXT("Remaining Time: %f"),BattleGameMode->GetCountdownTime()));
+		}
+	}
+	
+	if (CountdownInt != SecondsLeft) // 每秒更新一次
+	{
+		if (MatchState == MatchState::WaitingToStart)
+		{
+			SetHUDAnnouncementCountdown(TimeLeft);
+		}
+		else if (MatchState == MatchState::InProgress)
+		{
+			SetHUDMatchCountDownTime(TimeLeft);
+		} 
+		else if (MatchState == MatchState::Cooldown)
+		{
+			SetHUDAnnouncementCountdown(TimeLeft);
+		}
+	}
+	CountdownInt = SecondsLeft;
+}
+
 void ABattlePlayerController::SetHUDMatchCountDownTime(float CountDownTime)
 {
 	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
@@ -146,11 +197,39 @@ void ABattlePlayerController::SetHUDMatchCountDownTime(float CountDownTime)
 		BattleHUD->CharacterOverlay->MatchCountDownText;
 	if (bHUDValid)
 	{
+		if (CountDownTime < 0.f)
+		{
+			BattleHUD->CharacterOverlay->MatchCountDownText->SetText(FText());
+			return;
+		}
+
 		int32 Minutes = FMath::FloorToInt(CountDownTime / 60.f);
 		int32 Seconds = CountDownTime - Minutes * 60;
 
 		FString CountdownText = FString::Printf(TEXT("%02d:%02d"), Minutes, Seconds);
 		BattleHUD->CharacterOverlay->MatchCountDownText->SetText(FText::FromString(CountdownText));
+	}
+}
+
+void ABattlePlayerController::SetHUDAnnouncementCountdown(float CountdownTime)
+{
+	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
+	bool bHUDValid = BattleHUD &&
+		BattleHUD->Announcement &&
+		BattleHUD->Announcement->WarmupTime;
+	if (bHUDValid)
+	{
+		if (CountdownTime < 0.f)
+		{
+			BattleHUD->Announcement->WarmupTime->SetText(FText());
+			return;
+		}
+		
+		int32 Minutes = FMath::FloorToInt(CountdownTime / 60.f);
+		int32 Seconds = CountdownTime - Minutes * 60;
+
+		FString CountdownText = FString::Printf(TEXT("%02d:%02d"), Minutes, Seconds);
+		BattleHUD->Announcement->WarmupTime->SetText(FText::FromString(CountdownText));
 	}
 }
 
@@ -169,17 +248,6 @@ void ABattlePlayerController::PollInit()
 			}
 		}
 	}
-}
-
-void ABattlePlayerController::SetHUDTime()
-{
-	uint32 SecondsLeft = FMath::CeilToInt(MatchTime - GetServerTime()); // GetWorld()->GetTimeSeconds()对每个机器实例都不相同
-	if (CountdownInt != SecondsLeft) // 每秒更新一次
-	{
-		SetHUDMatchCountDownTime(MatchTime - GetServerTime());
-	} 
-
-	CountdownInt = SecondsLeft;
 }
 
 void ABattlePlayerController::ServerRequestServerTime_Implementation(float TimeOfClientRequest)
@@ -213,17 +281,46 @@ void ABattlePlayerController::CheckTimeSync(float DeltaTime)
 }
 
 
+void ABattlePlayerController::ServerCheckMatchState_Implementation()
+{
+	ABattleGameMode* GameMode = Cast<ABattleGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
+	if (GameMode)
+	{
+		WarmupTime = GameMode->WarmupTime;
+		MatchTime = GameMode->MatchTime;
+		LevelStartingTime = GameMode->LevelStartingTime;
+		CooldownTime=GameMode->CooldownTime;
+		MatchState = GameMode->GetMatchState();
+		ClientJoinMidgame(MatchState, WarmupTime, MatchTime,CooldownTime, LevelStartingTime);
+	}
+}
+
+void ABattlePlayerController::ClientJoinMidgame_Implementation(FName InMatchState, float InWarmupTime, float InMatchTime, float InCooldownTime, float InLevelStartingTime)
+{
+	WarmupTime = InWarmupTime;
+	MatchTime = InMatchTime;
+	CooldownTime=InCooldownTime;
+	LevelStartingTime = InLevelStartingTime;
+	MatchState = InMatchState;
+	OnMatchStateSet(MatchState);
+
+	if (BattleHUD && MatchState == MatchState::WaitingToStart)
+	{
+		BattleHUD->AddAnnouncement();
+	}
+}
+
 void ABattlePlayerController::OnMatchStateSet(FName State)
 {
 	MatchState = State;
 
 	if (MatchState == MatchState::InProgress)
 	{
-		BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
-		if (BattleHUD)
-		{
-			BattleHUD->AddCharacterOverlay();
-		}
+		HandleMatchHasStarted();
+	}
+	else if (MatchState == MatchState::Cooldown)
+	{
+		HandleCooldown();
 	}
 }
 
@@ -231,10 +328,83 @@ void ABattlePlayerController::OnRep_MatchState()
 {
 	if (MatchState == MatchState::InProgress)
 	{
-		BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
-		if (BattleHUD)
+		HandleMatchHasStarted();
+	}
+	else if (MatchState == MatchState::Cooldown)
+	{
+		HandleCooldown();
+	}
+}
+
+void ABattlePlayerController::HandleMatchHasStarted()
+{
+	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
+	if (BattleHUD)
+	{
+		BattleHUD->AddCharacterOverlay();
+		if (BattleHUD->Announcement)
 		{
-			BattleHUD->AddCharacterOverlay();
+			BattleHUD->Announcement->SetVisibility(ESlateVisibility::Hidden);
+		}
+	}
+}
+
+void ABattlePlayerController::HandleCooldown()
+{
+	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
+	if (BattleHUD)
+	{
+		BattleHUD->CharacterOverlay->RemoveFromParent();
+		bool bHUDValid = BattleHUD->Announcement &&
+			BattleHUD->Announcement->AnnouncementText &&
+			BattleHUD->Announcement->InfoText;
+		if (bHUDValid)
+		{
+			BattleHUD->Announcement->SetVisibility(ESlateVisibility::Visible);
+
+			FString AnnouncementText("New Match Starts In:");
+			BattleHUD->Announcement->AnnouncementText->SetText(FText::FromString(AnnouncementText));
+
+			ABattleGameState* BattleGameState = Cast<ABattleGameState>(UGameplayStatics::GetGameState(this));
+			ABattlePlayerState* BattlePlayerState = GetPlayerState<ABattlePlayerState>();
+			if (BattleGameState && BattlePlayerState)
+			{
+				TArray<ABattlePlayerState*> TopPlayers = BattleGameState->TopScoringPlayers;
+				FString InfoTextString;
+				if (TopPlayers.Num() == 0)
+				{
+					InfoTextString = FString("There is no winner.");
+				}
+				else if (TopPlayers.Num() == 1 && TopPlayers[0] == BattlePlayerState)
+				{
+					InfoTextString = FString("You are the winner!");
+				}
+				else if (TopPlayers.Num() == 1)
+				{
+					InfoTextString = FString::Printf(TEXT("Winner: \n%s"), *TopPlayers[0]->GetPlayerName());
+				}
+				else if (TopPlayers.Num() > 1)
+				{
+					InfoTextString = FString("Players tied for the win:\n");
+					for (auto TiedPlayer : TopPlayers)
+					{
+						InfoTextString.Append(FString::Printf(TEXT("%s\n"), *TiedPlayer->GetPlayerName()));
+					}
+				}
+
+				BattleHUD->Announcement->InfoText->SetText(FText::FromString(InfoTextString));
+			}
+		}
+		BattleHUD->Announcement->SetVisibility(ESlateVisibility::Visible);
+	}
+
+	ABattleCharacter* BattleCharacter = Cast<ABattleCharacter>(GetPawn());
+	if (BattleCharacter)
+	{
+		BattleCharacter->bDisableGameplay = true;
+		if (BattleCharacter->GetCombat())
+		{
+			BattleCharacter->GetCombat()->FireButtonPress(false);
 		}
 	}
 }

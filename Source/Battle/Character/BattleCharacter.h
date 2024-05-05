@@ -18,14 +18,17 @@ class BATTLE_API ABattleCharacter : public ACharacter,public IInteractWithCrossh
 
 public:
 	ABattleCharacter();
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override; // 注册需要复制的变量
 	virtual void PostInitializeComponents() override; // 在组件初始化完成过后自动调用
 
 	virtual void Destroyed() override;
 
-protected:
-	virtual void BeginPlay() override;
+
+	UPROPERTY(Replicated)
+	bool bDisableGameplay = false;
+	FORCEINLINE bool GetDisableGameplay() const { return bDisableGameplay; }
 
 	// Input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -77,6 +80,7 @@ private:
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class UCombatComponent* CombatComponent;
+	
 
 	class ABattlePlayerController* BattlePlayerController;
 
@@ -118,6 +122,7 @@ public:
 	void AimOffset(float DeltaTime);
 	void CalculateAO_Pitch();
 	void SimProxiesTurn();
+	void RotateInPlace(float DeltaTime);
 	FORCEINLINE float GetAOYaw(){return AO_Yaw;}
 	FORCEINLINE float GetAOPitch() { return AO_Pitch;}
 	AWeapon* GetEquippedWeapon();
@@ -132,6 +137,7 @@ public:
 	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
 	virtual void OnRep_ReplicatedMovement() override; // 每当同步物体运动时会被调用
 	float CalculateSpeed();
+	FORCEINLINE UCombatComponent* GetCombat() const { return CombatComponent; }
 
 
 	/*

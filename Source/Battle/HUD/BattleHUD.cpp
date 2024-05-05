@@ -4,6 +4,7 @@
 #include "BattleHUD.h"
 #include "Blueprint/UserWidget.h"
 #include "CharacterOverlay.h"
+#include "Announcement.h"
 
 void ABattleHUD::BeginPlay()
 {
@@ -88,5 +89,15 @@ void ABattleHUD::AddCharacterOverlay()
 	{
 		CharacterOverlay = CreateWidget<UCharacterOverlay>(PlayerController, CharacterOverlayClass);
 		CharacterOverlay->AddToViewport();
+	}
+}
+
+void ABattleHUD::AddAnnouncement()
+{
+	APlayerController* PlayerController = GetOwningPlayerController();
+	if (PlayerController && AnnouncementClass)
+	{
+		Announcement = CreateWidget<UAnnouncement>(PlayerController, AnnouncementClass);
+		Announcement->AddToViewport();
 	}
 }

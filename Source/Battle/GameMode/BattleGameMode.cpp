@@ -7,6 +7,13 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
 #include "Battle/PlayerState/BattlePlayerState.h"
+#include "Battle/GameState/BattleGameState.h"
+
+// 定义
+namespace MatchState
+{
+	const FName Cooldown = FName("Cooldown");
+}
 
 ABattleGameMode::ABattleGameMode()
 {
@@ -32,6 +39,22 @@ void ABattleGameMode::Tick(float DeltaTime)
 			StartMatch();
 		}
 	}
+	else if (MatchState == MatchState::InProgress)
+	{
+		CountdownTime = WarmupTime + MatchTime - GetWorld()->GetTimeSeconds() + LevelStartingTime;
+		if (CountdownTime <= 0.f)
+		{
+			SetMatchState(MatchState::Cooldown);
+		}
+	}
+	else if (MatchState == MatchState::Cooldown)
+	{
+		CountdownTime = CooldownTime + WarmupTime + MatchTime - GetWorld()->GetTimeSeconds() + LevelStartingTime;
+		if (CountdownTime <= 0.f)
+		{
+			RestartGame();
+		}
+	}
 }
 
 void ABattleGameMode::PlayerEliminated(class ABattleCharacter* ElimmedCharacter, class ABattlePlayerController* VictimController, ABattlePlayerController* AttackerController)
@@ -39,9 +62,16 @@ void ABattleGameMode::PlayerEliminated(class ABattleCharacter* ElimmedCharacter,
 	ABattlePlayerState* AttackerPlayerState = AttackerController ? Cast<ABattlePlayerState>(AttackerController->PlayerState) : nullptr;
 	ABattlePlayerState* VictimPlayerState = VictimController ? Cast<ABattlePlayerState>(VictimController->PlayerState) : nullptr;
 
+
 	if (AttackerPlayerState && AttackerPlayerState != VictimPlayerState)
 	{
 		AttackerPlayerState->AddToScore(5);
+
+		ABattleGameState* BattleGameState = GetGameState<ABattleGameState>();
+		if (BattleGameState)
+		{
+			BattleGameState->UpdateTopScore(AttackerPlayerState);
+		}
 	}
 	if (VictimPlayerState)
 	{

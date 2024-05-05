@@ -65,6 +65,7 @@ void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	//DOREPLIFETIME(ABattleCharacter,OverlappingWeapon);
 	DOREPLIFETIME_CONDITION(ABattleCharacter, OverlappingWeapon,COND_OwnerOnly); // 只同步到拥有的客户端（确定了同步给谁）
 	DOREPLIFETIME(ABattleCharacter,Health);
+	DOREPLIFETIME(ABattleCharacter,bDisableGameplay);
 }
 
 void ABattleCharacter::PostInitializeComponents()
@@ -110,27 +111,12 @@ void ABattleCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (GetLocalRole() > ENetRole::ROLE_SimulatedProxy && IsLocallyControlled())
-	{// 服务器上或者自主
-		AimOffset(DeltaTime);
-	}
-	else
-	{
-		//SimProxiesTurn(); // 不能在tick中调用，因为tick的频率实际上比网络netfrequence快，所以有些delta值为0
-		TimeSinceLastMovementReplication += DeltaTime;
-		if (TimeSinceLastMovementReplication > 0.25f)
-		{
-			OnRep_ReplicatedMovement();
-		}
-		CalculateAO_Pitch();
-	}
+	RotateInPlace(DeltaTime);
 
 	HideCharacterIfCameraClose();
 
 	PollInit(); // 轮询 因为第一帧中playerstate无效
 }
-
-
 
 void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -154,6 +140,8 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void ABattleCharacter::Move(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
+
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
 	if (Controller != nullptr)
@@ -168,7 +156,7 @@ void ABattleCharacter::Move(const FInputActionValue& Value)
 		AddMovementInput(RightDirection, MovementVector.X);
 	}
 
-	GEngine->AddOnScreenDebugMessage(-1,2,FColor::Red,TEXT("MOVE"));
+	// GEngine->AddOnScreenDebugMessage(-1,2,FColor::Red,TEXT("MOVE"));
 }
 
 void ABattleCharacter::Look(const FInputActionValue& Value)
@@ -184,6 +172,8 @@ void ABattleCharacter::Look(const FInputActionValue& Value)
 
 void ABattleCharacter::Jump()
 {
+	if (bDisableGameplay) return;
+
 	if (bIsCrouched)
 	{
 		UnCrouch();
@@ -196,6 +186,8 @@ void ABattleCharacter::Jump()
 
 void ABattleCharacter::EquipButtonPress(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
+
 	bool bEquipped = Value.Get<bool>();
 
 	if (CombatComponent) 
@@ -221,6 +213,7 @@ void ABattleCharacter::ServerEquipButtonPressed_Implementation()
 
 void ABattleCharacter::CrouchButtonPress(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (bIsCrouched) //虚幻内置已经处理好，自动同步过
 	{
 		UnCrouch();
@@ -234,6 +227,7 @@ void ABattleCharacter::CrouchButtonPress(const FInputActionValue& Value)
 
 void ABattleCharacter::AimButtonPress(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComponent)
 	{
 		CombatComponent->SetAiming(true);
@@ -242,6 +236,7 @@ void ABattleCharacter::AimButtonPress(const FInputActionValue& Value)
 
 void ABattleCharacter::AimButtonRelease(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComponent)
 	{
 		CombatComponent->SetAiming(false);
@@ -250,6 +245,7 @@ void ABattleCharacter::AimButtonRelease(const FInputActionValue& Value)
 
 void ABattleCharacter::FireButtonPress(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComponent)
 	{
 		CombatComponent->FireButtonPress(true);
@@ -258,6 +254,7 @@ void ABattleCharacter::FireButtonPress(const FInputActionValue& Value)
 
 void ABattleCharacter::FireButtonRelease(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComponent)
 	{
 		CombatComponent->FireButtonPress(false);
@@ -266,6 +263,7 @@ void ABattleCharacter::FireButtonRelease(const FInputActionValue& Value)
 
 void ABattleCharacter::ReloadButtonPress(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComponent)
 	{
 		CombatComponent->Reload();
@@ -438,10 +436,30 @@ void ABattleCharacter::TurnInPlace(float DeltaTime)
 	}
 }
 
-//void ABattleCharacter::MulticastHit_Implementation()
-//{
-//	PlayHitReactMontage();
-//}
+void ABattleCharacter::RotateInPlace(float DeltaTime)
+{
+	if (bDisableGameplay)
+	{
+		bUseControllerRotationYaw = false;
+		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		return;
+	}
+
+	if (GetLocalRole() > ENetRole::ROLE_SimulatedProxy && IsLocallyControlled())
+	{// 服务器上或者自主
+		AimOffset(DeltaTime);
+	}
+	else
+	{
+		//SimProxiesTurn(); // 不能在tick中调用，因为tick的频率实际上比网络netfrequence快，所以有些delta值为0
+		TimeSinceLastMovementReplication += DeltaTime;
+		if (TimeSinceLastMovementReplication > 0.25f)
+		{
+			OnRep_ReplicatedMovement();
+		}
+		CalculateAO_Pitch();
+	}
+}
 
 void ABattleCharacter::HideCharacterIfCameraClose()
 {
@@ -614,10 +632,11 @@ void ABattleCharacter::MulticastElim_Implementation()
 	GetCharacterMovement()->DisableMovement();
 	GetCharacterMovement()->StopMovementImmediately();
 
-	// Disable Input
-	if (BattlePlayerController)
+	// Disable Gameplay Input
+	bDisableGameplay=true;
+	if (CombatComponent)
 	{
-		DisableInput(BattlePlayerController);
+		CombatComponent->FireButtonPress(false);
 	}
 
 	// Disable Collision
