@@ -341,7 +341,10 @@ void ABattlePlayerController::HandleMatchHasStarted()
 	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
 	if (BattleHUD)
 	{
-		BattleHUD->AddCharacterOverlay();
+		if (BattleHUD->CharacterOverlay == nullptr)
+		{
+			BattleHUD->AddCharacterOverlay();
+		}		
 		if (BattleHUD->Announcement)
 		{
 			BattleHUD->Announcement->SetVisibility(ESlateVisibility::Hidden);
