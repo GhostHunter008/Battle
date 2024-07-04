@@ -6,7 +6,8 @@
 #include "Battle/BattleTypes/CombatStates.h"
 #include "CombatComponent.generated.h"
 
-#define TRACE_LENGTH 80000;
+
+// #define TRACE_LENGTH 80000; 在WeaponType中定义
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -156,8 +157,11 @@ public:
 	UPROPERTY(EditAnywhere)
 	int32 StartingPistolAmmo = 60;
 
+	UPROPERTY(EditAnywhere)
+	int32 StartingSMGAmmo = 120;
 
-
+	UPROPERTY(EditAnywhere)
+	int32 StartingShotgunAmmo = 0;
 
 
 
