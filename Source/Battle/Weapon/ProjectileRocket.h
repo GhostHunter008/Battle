@@ -19,6 +19,9 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Destroyed() override;
 
+	UPROPERTY(VisibleAnywhere)
+	class URocketMovementComponent* RocketMovementComponent;
+
 	UPROPERTY(EditAnywhere)
 	class UNiagaraSystem* TrailSystem;
 	class UNiagaraComponent* TrailSystemComponent; // 方便手动销毁

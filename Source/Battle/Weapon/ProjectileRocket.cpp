@@ -9,12 +9,20 @@
 #include "Components/BoxComponent.h"
 #include "Sound/SoundCue.h"
 #include "Components/AudioComponent.h"
+#include "RocketMovementComponent.h"
 
 AProjectileRocket::AProjectileRocket()
 {
 	RocketMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Rocket Mesh"));
 	RocketMesh->SetupAttachment(RootComponent);
 	RocketMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	RocketMovementComponent = CreateDefaultSubobject<URocketMovementComponent>(TEXT("RocketMovementComponent"));
+	RocketMovementComponent->bRotationFollowsVelocity = true;
+	RocketMovementComponent->InitialSpeed = 3000;
+	RocketMovementComponent->MaxSpeed = 3000;
+	RocketMovementComponent->ProjectileGravityScale = 0;
+	RocketMovementComponent->SetIsReplicated(true);
 }
 
 void AProjectileRocket::BeginPlay()
@@ -70,7 +78,13 @@ void AProjectileRocket::DestroyTimerFinished()
 
 void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	APawn* FiringPawn = GetInstigator();
+	// 避免在发射过程中碰到自己
+	if (OtherActor == GetOwner())
+	{
+		return;
+	}
+
+	APawn* FiringPawn = GetInstigator(); // 在ProjectileWeapon中的fire中设置了Instigator
 	if (FiringPawn && HasAuthority()) // 只有服务器端有权限施加伤害
 	{
 		AController* FiringController = FiringPawn->GetController();
@@ -92,7 +106,7 @@ void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 		}
 	}
 
-	// 火箭筒的部分效果想要延迟销毁，故不调用父类OnHit函数
+	// 火箭筒的部分效果想要延迟销毁，故不调用父类OnHit函数。如尾迹烟雾
 	// Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit); 
 
 	// 延迟三秒销毁

@@ -153,6 +153,9 @@ public:
 	UPROPERTY(EditAnywhere)
 	int32 StartingRcoketAmmo = 0;
 
+	UPROPERTY(EditAnywhere)
+	int32 StartingPistolAmmo = 60;
+
 
 
 

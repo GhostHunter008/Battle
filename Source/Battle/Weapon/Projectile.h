@@ -37,10 +37,13 @@ protected:
 	UPROPERTY(EditAnywhere)
 	class USoundCue* ImpactSound;
 
-private:
-
+	// 其构建迁移至具体的子类中（不在本类的构造函数中完成）
+	// 这样不同的子类可以具体拥有不同的ProjectileMovementComponent
+	// 如ProjectileRocket中使用的是RocketMovementComponent
 	UPROPERTY(VisibleAnywhere)
 	class UProjectileMovementComponent* ProjectileMovementComponent;
+
+private:
 
 	UPROPERTY(EditAnywhere)
 	class UParticleSystem* Tracer;
