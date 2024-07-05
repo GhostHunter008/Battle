@@ -6,9 +6,6 @@
 #include "Projectile.h"
 #include "ProjectileRocket.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class BATTLE_API AProjectileRocket : public AProjectile
 {
@@ -19,31 +16,17 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Destroyed() override;
 
-	UPROPERTY(VisibleAnywhere)
-	class URocketMovementComponent* RocketMovementComponent;
-
-	UPROPERTY(EditAnywhere)
-	class UNiagaraSystem* TrailSystem;
-	class UNiagaraComponent* TrailSystemComponent; // 方便手动销毁
-
 	UPROPERTY(EditAnywhere)
 	USoundCue* ProjectileLoop;
 	UPROPERTY(EditAnywhere)
 	USoundAttenuation* LoopingSoundAttenuation;
 	UAudioComponent* ProjectileLoopComponent; // 方便手动销毁
 
-	FTimerHandle DestroyTimer;
-	UPROPERTY(EditAnywhere)
-	float DestroyTime = 3.f;
-	void DestroyTimerFinished();
+	UPROPERTY(VisibleAnywhere)
+	class URocketMovementComponent* RocketMovementComponent;
 
 
 protected:
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit) override;
-
-
-private:
-	UPROPERTY(VisibleAnywhere)
-	UStaticMeshComponent* RocketMesh;
 	
 };

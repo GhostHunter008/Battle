@@ -1,9 +1,5 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "ProjectileRocket.h"
 #include "Kismet/GameplayStatics.h"
-#include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "Sound/SoundCue.h"
 #include "Components/BoxComponent.h"
@@ -13,9 +9,9 @@
 
 AProjectileRocket::AProjectileRocket()
 {
-	RocketMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Rocket Mesh"));
-	RocketMesh->SetupAttachment(RootComponent);
-	RocketMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Rocket Mesh"));
+	ProjectileMesh->SetupAttachment(RootComponent);
+	ProjectileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	RocketMovementComponent = CreateDefaultSubobject<URocketMovementComponent>(TEXT("RocketMovementComponent"));
 	RocketMovementComponent->bRotationFollowsVelocity = true;
@@ -29,23 +25,12 @@ void AProjectileRocket::BeginPlay()
 {
 	Super::BeginPlay(); // 在服务端已经绑定了OnHit
 
-	if (!HasAuthority()) //  客户端绑定OnHit
+	if (!HasAuthority()) // 客户端绑定OnHit
 	{
 		CollisionBox->OnComponentHit.AddDynamic(this, &AProjectileRocket::OnHit);
 	}
 
-	if (TrailSystem) // 播放尾迹特效
-	{
-		TrailSystemComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-			TrailSystem,
-			GetRootComponent(),
-			FName(),
-			GetActorLocation(),
-			GetActorRotation(),
-			EAttachLocation::KeepWorldPosition,
-			false
-		);
-	}
+	SpawnTrailSystem(); // 播放尾迹特效
 
 	if (ProjectileLoop && LoopingSoundAttenuation) // 播放声音特效
 	{
@@ -66,16 +51,6 @@ void AProjectileRocket::BeginPlay()
 	}
 }
 
-void AProjectileRocket::Destroyed() // 避免调用父类的函数
-{
-	
-}
-
-void AProjectileRocket::DestroyTimerFinished()
-{
-	Destroy();
-}
-
 void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	// 避免在发射过程中碰到自己
@@ -83,39 +58,12 @@ void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	{
 		return;
 	}
-
-	APawn* FiringPawn = GetInstigator(); // 在ProjectileWeapon中的fire中设置了Instigator
-	if (FiringPawn && HasAuthority()) // 只有服务器端有权限施加伤害
-	{
-		AController* FiringController = FiringPawn->GetController();
-		if (FiringController)
-		{
-			UGameplayStatics::ApplyRadialDamageWithFalloff(
-				this, // World context object
-				Damage, // BaseDamage
-				10.f, // MinimumDamage
-				GetActorLocation(), // Origin
-				200.f, // DamageInnerRadius
-				500.f, // DamageOuterRadius
-				1.f, // DamageFalloff
-				UDamageType::StaticClass(), // DamageTypeClass
-				TArray<AActor*>(), // IgnoreActors
-				this, // DamageCauser
-				FiringController // InstigatorController
-			);
-		}
-	}
+	ExplodeDamage();
 
 	// 火箭筒的部分效果想要延迟销毁，故不调用父类OnHit函数。如尾迹烟雾
-	// Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit); 
-
-	// 延迟三秒销毁
-	GetWorldTimerManager().SetTimer(
-		DestroyTimer,
-		this,
-		&AProjectileRocket::DestroyTimerFinished,
-		DestroyTime
-	);
+	// Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
+	
+	StartDestroyTimer();  // 延迟销毁
 
 	if (ImpactParticles)
 	{
@@ -125,9 +73,9 @@ void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, GetActorLocation());
 	}
-	if (RocketMesh)
+	if (ProjectileMesh)
 	{
-		RocketMesh->SetVisibility(false);
+		ProjectileMesh->SetVisibility(false);
 	}
 	if (CollisionBox)
 	{
@@ -141,4 +89,9 @@ void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	{
 		ProjectileLoopComponent->Stop();
 	}
+}
+
+void AProjectileRocket::Destroyed() // 避免调用父类的函数
+{
+
 }
