@@ -223,7 +223,9 @@ public:
 	*/
 	ECombatState GetCombatState() const;
 
-
+	/*Scope*/
+	UFUNCTION(BlueprintImplementableEvent)
+	void ShowSniperScopeWidget(bool bShowScope);
 
 
 

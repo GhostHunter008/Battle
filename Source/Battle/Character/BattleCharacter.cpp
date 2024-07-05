@@ -561,6 +561,11 @@ void ABattleCharacter::PlayReloadMontage()
 				SectionName = FName("Rifle");
 				break;
 			}
+			case EWeaponType::EWT_SniperRifle:
+			{
+				SectionName = FName("Rifle");
+				break;
+			}
 		}
 		
 		AnimInstance->Montage_JumpToSection(SectionName);
@@ -686,6 +691,17 @@ void ABattleCharacter::MulticastElim_Implementation()
 	if (BattlePlayerController)
 	{
 		BattlePlayerController->SetHUDWeaponAmmo(0);
+	}
+
+	// 如果开镜则关闭
+	bool bHideSniperScope = IsLocallyControlled() &&
+		CombatComponent &&
+		CombatComponent->bAiming &&
+		CombatComponent->EquippedWeapon &&
+		CombatComponent->EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle;
+	if (bHideSniperScope)
+	{
+		ShowSniperScopeWidget(false);
 	}
 }
 

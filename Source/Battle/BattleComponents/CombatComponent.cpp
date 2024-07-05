@@ -145,6 +145,8 @@ void UCombatComponent::OnRep_EquippedWeapon()
 
 void UCombatComponent::SetAiming(bool InbAiming)
 {
+	if (BattleCharacter == nullptr || EquippedWeapon == nullptr) return;
+
 	bAiming=InbAiming; // 这一行可以不删，在服务器上调用时可以快一步设置
 	if (!BattleCharacter->HasAuthority())
 	{// Client
@@ -153,6 +155,11 @@ void UCombatComponent::SetAiming(bool InbAiming)
 	if (BattleCharacter)
 	{
 		BattleCharacter->GetCharacterMovement()->MaxWalkSpeed=bAiming ? AimWalkSpeed : BaseWalkSpeed;
+	}
+
+	if (BattleCharacter->IsLocallyControlled() && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle)
+	{
+		BattleCharacter->ShowSniperScopeWidget(InbAiming);
 	}
 }
 
@@ -385,6 +392,7 @@ void UCombatComponent::InitializeCarriedAmmo()
 	CarriedAmmoMap.Emplace(EWeaponType::EWT_Pistol, StartingPistolAmmo);
 	CarriedAmmoMap.Emplace(EWeaponType::EWT_SubmachineGun, StartingSMGAmmo);
 	CarriedAmmoMap.Emplace(EWeaponType::EWT_Shotgun, StartingShotgunAmmo);
+	CarriedAmmoMap.Emplace(EWeaponType::EWT_SniperRifle, StartingSniperAmmo);
 }
 
 void UCombatComponent::Reload()
