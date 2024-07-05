@@ -9,6 +9,7 @@
 #include "Engine/SkeletalMeshSocket.h"
 #include "Battle/Character/BattleCharacter.h"
 #include "Battle/PlayerController/BattlePlayerController.h"
+#include "Battle/BattleComponents/CombatComponent.h"
 
 
 AWeapon::AWeapon()
@@ -178,8 +179,20 @@ bool AWeapon::IsEmpty()
 	return Ammo <= 0; 
 }
 
+bool AWeapon::IsFull()
+{
+	return Ammo == MagCapacity;
+}
+
 void AWeapon::OnRep_Ammo()
 {
+	// 霰弹枪的逻辑，保证客户端动画正确
+	BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(GetOwner()) : BattleOwnerCharacter;
+	if (BattleOwnerCharacter && BattleOwnerCharacter->GetCombat() && IsFull() && WeaponType==EWeaponType::EWT_Shotgun)
+	{
+		BattleOwnerCharacter->GetCombat()->JumpToShotgunEnd();
+	}
+
 	SetupHUDAmmo();
 }
 

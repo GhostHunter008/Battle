@@ -133,6 +133,7 @@ public:
 	virtual void OnRep_Owner() override;
 
 	bool IsEmpty();
+	bool IsFull();
 
 	UPROPERTY(EditAnywhere)
 	EWeaponType WeaponType;

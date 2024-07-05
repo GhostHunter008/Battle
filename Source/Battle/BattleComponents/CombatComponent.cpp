@@ -345,6 +345,16 @@ void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& Trac
 void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
 	if (EquippedWeapon == nullptr) return;
+	
+	// 霰弹枪特意化处理
+	if (BattleCharacter && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
+	{
+		BattleCharacter->PlayFireMontage(bAiming);
+		EquippedWeapon->Fire(TraceHitTarget);
+		CombatState = ECombatState::ECS_Unoccupied;
+		return;
+	}
+
 	if (BattleCharacter && CombatState == ECombatState::ECS_Unoccupied)
 	{
 		BattleCharacter->PlayFireMontage(bAiming);
@@ -382,6 +392,9 @@ bool UCombatComponent::CanFire()
 {
 	if(EquippedWeapon==nullptr) return false;
 
+	// 霰弹枪专有逻辑，可以在撞弹过程中进行打断
+	if (!EquippedWeapon->IsEmpty() && bCanFire && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun) return true;
+	
 	return !EquippedWeapon->IsEmpty() && bCanFire && CombatState==ECombatState::ECS_Unoccupied;
 }
 
@@ -467,6 +480,50 @@ void UCombatComponent::UpdateAmmoValues()
 	EquippedWeapon->AddAmmo(ReloadInMag);
 }
 
+void UCombatComponent::UpdateShotgunAmmoValues()
+{
+	if (BattleCharacter == nullptr || EquippedWeapon == nullptr) return;
+
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] -= 1;
+		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+	}
+	// 设置携带弹药的数量（更新UI）
+	BattleController = BattleController == nullptr ? Cast<ABattlePlayerController>(BattleCharacter->Controller) : BattleController;
+	if (BattleController)
+	{
+		BattleController->SetHUDCarryAmmo(CarriedAmmo);
+	}
+	// 设置武器中弹药的数量（更新UI）
+	EquippedWeapon->AddAmmo(1);
+
+
+	bCanFire = true; // 无需完整装填，可以继续开枪
+	if (EquippedWeapon->IsFull() || CarriedAmmo == 0)
+	{
+		JumpToShotgunEnd(); // 服务端跳到End动画，还需要在Rep中设置客户端的动画
+	}
+}
+
+void UCombatComponent::JumpToShotgunEnd()
+{
+	// Jump to ShotgunEnd section
+	UAnimInstance* AnimInstance = BattleCharacter->GetMesh()->GetAnimInstance();
+	if (AnimInstance && BattleCharacter->GetReloadMontage())
+	{
+		AnimInstance->Montage_JumpToSection(FName("ShotgunEnd"));
+	}
+}
+
+void UCombatComponent::ShotgunShellReload()
+{
+	if (BattleCharacter && BattleCharacter->HasAuthority()) // 仅服务端有权限
+	{
+		UpdateShotgunAmmoValues();
+	}
+}
+
 void UCombatComponent::HandleReload()
 {
 	BattleCharacter->PlayReloadMontage();
@@ -478,5 +535,16 @@ void UCombatComponent::OnRep_CarriedAmmo()
 	if (BattleController)
 	{
 		BattleController->SetHUDCarryAmmo(CarriedAmmo); // 由服务器决定
+	}
+
+	// 霰弹枪的逻辑，保证客户端动画正确
+	bool bJumpToShotgunEnd =
+		CombatState == ECombatState::ECS_Reloading &&
+		EquippedWeapon != nullptr &&
+		EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun &&
+		CarriedAmmo == 0;
+	if (bJumpToShotgunEnd)
+	{
+		JumpToShotgunEnd();
 	}
 }

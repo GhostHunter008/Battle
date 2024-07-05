@@ -136,6 +136,11 @@ public:
 	int32 AmountToReload(); // 计算换弹时需要填充多少子弹
 
 	void UpdateAmmoValues(); // 更新墙内子弹和携带的子弹数量（HUD）
+	
+	void UpdateShotgunAmmoValues(); // 霰弹枪有特意化处理
+	void JumpToShotgunEnd(); 
+	UFUNCTION(BlueprintCallable)
+	void ShotgunShellReload();  // 只有服务端有权限，由MTReload蒙太奇中的Shell通知触发
 
 	// 当前武器类型的所携带的弹药数量，根据EWeaponType决定
 	UPROPERTY(ReplicatedUsing = OnRep_CarriedAmmo)

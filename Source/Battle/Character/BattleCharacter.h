@@ -227,7 +227,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent)
 	void ShowSniperScopeWidget(bool bShowScope);
 
-
+	FORCEINLINE UAnimMontage* GetReloadMontage() const { return ReloadMontage; }
 
 
 
