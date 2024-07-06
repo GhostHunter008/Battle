@@ -142,6 +142,9 @@ public:
 	FORCEINLINE int32 GetAmmo(){return Ammo;}
 	FORCEINLINE int32 GetMagCapacity() { return MagCapacity; }
 
-
+	/**
+	* Enable or disable custom depth
+	*/
+	void EnableCustomDepth(bool bEnable);
 
 };
