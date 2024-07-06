@@ -233,6 +233,23 @@ void ABattlePlayerController::SetHUDAnnouncementCountdown(float CountdownTime)
 	}
 }
 
+void ABattlePlayerController::SetHUDGrenades(int32 Grenades)
+{
+	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
+	bool bHUDValid = BattleHUD &&
+		BattleHUD->CharacterOverlay &&
+		BattleHUD->CharacterOverlay->GrenadeAmountText;
+	if (bHUDValid)
+	{
+		FString GrenadesText = FString::Printf(TEXT("%d"), Grenades);
+		BattleHUD->CharacterOverlay->GrenadeAmountText->SetText(FText::FromString(GrenadesText));
+	}
+	else
+	{
+		HUDGrenades = Grenades;
+	}
+}
+
 void ABattlePlayerController::PollInit()
 {
 	if (CharacterOverlay == nullptr)
@@ -245,6 +262,12 @@ void ABattlePlayerController::PollInit()
 				SetHUDHealth(HUDHealth, HUDMaxHealth);
 				SetHUDScore(HUDScore);
 				SetHUDDefeats(HUDDefeats);
+
+				ABattleCharacter* BattleCharacter = Cast<ABattleCharacter>(GetPawn());
+				if (BattleCharacter && BattleCharacter->GetCombat())
+				{
+					SetHUDGrenades(BattleCharacter->GetCombat()->GetGrenadeAmount());
+				}
 			}
 		}
 	}

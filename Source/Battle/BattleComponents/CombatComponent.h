@@ -48,6 +48,10 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	class AWeapon* EquippedWeapon;
 
+	void PlayEquipWeaponSound();
+
+	void DropEquippedWeapon();
+
 /************************************************************************/
 /* 瞄准                                                 
 /************************************************************************/
@@ -124,14 +128,18 @@ public:
 /************************************************************************/
 public:
 	void Reload();
-
+	
 	UFUNCTION(Server, Reliable)
 	void ServerReload();
+
+	void ReloadEmptyWeapon(); // 自动换单
 
 	void HandleReload(); // 服务器和客户端上相同的处理逻辑
 
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
+
+	void UpdateCarriedAmmo();
 
 	int32 AmountToReload(); // 计算换弹时需要填充多少子弹
 
@@ -174,7 +182,42 @@ public:
 	UPROPERTY(EditAnywhere)
 	int32 StartingGrenadeLauncherAmmo = 0;
 
+/************************************************************************/
+/*   Grenade                                                          */
+/************************************************************************/
+	void ThrowGrenade();
 
+	UFUNCTION(Server, Reliable)
+	void ServerThrowGrenade();
 
+	UFUNCTION(BlueprintCallable)
+	void ThrowGrenadeFinished(); // 动画通知
 
+	void AttachActorToRightHand(AActor* ActorToAttach);
+	void AttachActorToLeftHand(AActor* ActorToAttach);
+
+	UFUNCTION(BlueprintCallable)
+	void LaunchGrenade(); // 动画通知
+
+	UFUNCTION(Server, Reliable)
+	void ServerLaunchGrenade(const FVector_NetQuantize& Target);
+	
+	void ShowAttachedGrenade(bool bShowGrenade);
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class AProjectile> GrenadeClass;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Grenades)
+	int32 GrenadeAmount = 4;
+	UFUNCTION()
+	void OnRep_Grenades();
+
+	FORCEINLINE int32 GetGrenadeAmount() const { return GrenadeAmount; }
+
+	UPROPERTY(EditAnywhere)
+	int32 MaxGrenadeAmount = 4;
+
+	void UpdateHUDGrenadeAmount();
+	
+	
 };

@@ -56,6 +56,10 @@ ABattleCharacter::ABattleCharacter()
 	TurningInPlace=ETurningInPlace::ETIP_NotTurning;
 
 	DissolveTimelineComp = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimelineComponent"));
+
+	AttachedGrenade = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Attached Grenade"));
+	AttachedGrenade->SetupAttachment(GetMesh(), FName("GrenadeSocket"));
+	AttachedGrenade->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -105,6 +109,11 @@ void ABattleCharacter::BeginPlay()
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ABattleCharacter::ReceiveDamage);
 	}
+
+	if (AttachedGrenade)
+	{
+		AttachedGrenade->SetVisibility(false);
+	}
 }
 
 void ABattleCharacter::Tick(float DeltaTime)
@@ -135,6 +144,7 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ABattleCharacter::FireButtonPress);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ABattleCharacter::FireButtonRelease);
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ABattleCharacter::ReloadButtonPress);
+		EnhancedInputComponent->BindAction(ThrowGrenadeAction, ETriggerEvent::Started, this, &ABattleCharacter::GrenadeButtonPressed);
 	}
 }
 
@@ -269,6 +279,14 @@ void ABattleCharacter::ReloadButtonPress(const FInputActionValue& Value)
 		CombatComponent->Reload();
 	}
 }	
+
+void ABattleCharacter::GrenadeButtonPressed(const FInputActionValue& Value)
+{
+	if (CombatComponent)
+	{
+		CombatComponent->ThrowGrenade();
+	}
+}
 
 void ABattleCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon) // 确定了接收到Rep的行为
 {
@@ -600,6 +618,8 @@ float ABattleCharacter::CalculateSpeed()
 
 void ABattleCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser)
 {
+	if (bElimmed) return; // 正在死亡无需再次受到伤害
+
 	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
 
 	// 服务端的反应，在Onrep_health,对客户端进行同样的设置
@@ -763,5 +783,14 @@ ECombatState ABattleCharacter::GetCombatState() const
 {
 	if (CombatComponent == nullptr) return ECombatState::ECS_MAX;
 	return CombatComponent->CombatState;
+}
+
+void ABattleCharacter::PlayThrowGrenadeMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ThrowGrenadeMontage)
+	{
+		AnimInstance->Montage_Play(ThrowGrenadeMontage);
+	}
 }
 

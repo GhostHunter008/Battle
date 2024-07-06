@@ -100,7 +100,7 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 
 	bElimmed=BattleCharacter->IsElimmed();
 
-	bUseFABRIK= BattleCharacter->GetCombatState() != ECombatState::ECS_Reloading;
-	bUseAimOffset= BattleCharacter->GetCombatState() != ECombatState::ECS_Reloading && !BattleCharacter->GetDisableGameplay() ;
-	bTransformRightHand = BattleCharacter->GetCombatState() != ECombatState::ECS_Reloading && !BattleCharacter->GetDisableGameplay();
+	bUseFABRIK = BattleCharacter->GetCombatState() == ECombatState::ECS_Unoccupied;
+	bUseAimOffset = BattleCharacter->GetCombatState() == ECombatState::ECS_Unoccupied && !BattleCharacter->GetDisableGameplay();
+	bTransformRightHand = BattleCharacter->GetCombatState() == ECombatState::ECS_Unoccupied && !BattleCharacter->GetDisableGameplay();
 }

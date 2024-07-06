@@ -44,6 +44,7 @@ public:
 	void FireButtonPress(const FInputActionValue& Value);
 	void FireButtonRelease(const FInputActionValue& Value);
 	void ReloadButtonPress(const FInputActionValue& Value);
+	void GrenadeButtonPressed(const FInputActionValue& Value);
 
 private:
 	UPROPERTY(VisibleAnywhere,Category=Camera)
@@ -69,6 +70,8 @@ private:
 	class UInputAction* FireAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* ReloadAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* ThrowGrenadeAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
 	class UWidgetComponent* OverheadWidget; // 用于在人物上方显示信息
@@ -229,6 +232,17 @@ public:
 
 	FORCEINLINE UAnimMontage* GetReloadMontage() const { return ReloadMontage; }
 
+	// throw grenade
+	UPROPERTY(EditAnywhere, Category = Combat)
+	UAnimMontage* ThrowGrenadeMontage;
 
+	void PlayThrowGrenadeMontage();
 
+	/**
+	* Grenade
+	*/
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* AttachedGrenade;
+
+	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
 };

@@ -29,6 +29,8 @@ public:
 	void SetHUDMatchCountDownTime(float CountDownTime);
 	void SetHUDAnnouncementCountdown(float CountdownTime);
 
+	void SetHUDGrenades(int32 Grenades);
+
 /************************************************************************/
 /*  初始化HUD
 /************************************************************************/
@@ -40,6 +42,7 @@ public:
 	float HUDMaxHealth;
 	float HUDScore;
 	int32 HUDDefeats;
+	int32 HUDGrenades;
 
 /**
 * Sync time between client and server
