@@ -159,7 +159,12 @@ public:
 
 	TMap<EWeaponType, int32> CarriedAmmoMap;  // 注意Tmap类型无法复制,因为服务器和客户端产生哈希值不一定相同
 
+	UPROPERTY(EditAnywhere)
+	int32 MaxCarriedAmmo = 500;
+
 	void InitializeCarriedAmmo();
+
+	void PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount);
 
 	UPROPERTY(EditAnywhere)
 	int32 StartingARAmmo = 30;
