@@ -31,19 +31,30 @@ public:
 
 	void SetHUDGrenades(int32 Grenades);
 
+	void SetHUDShield(float Shield, float MaxShield);
 /************************************************************************/
 /*  初始化HUD
 /************************************************************************/
 	
 	void PollInit(); // 轮询，值得改进
-	bool bInitializeCharacterOverlay = false;
+	// bool bInitializeCharacterOverlay = false;
 
 	float HUDHealth;
 	float HUDMaxHealth;
-	float HUDScore;
-	int32 HUDDefeats;
-	int32 HUDGrenades;
+	bool bInitializeHealth = false;
 
+	float HUDScore;
+	bool bInitializeScore = false;
+
+	int32 HUDDefeats;
+	bool bInitializeDefeats = false;
+
+	int32 HUDGrenades;
+	bool bInitializeGrenades = false;
+
+	float HUDShield;
+	float HUDMaxShield;
+	bool bInitializeShield = false;
 /**
 * Sync time between client and server
 */

@@ -66,4 +66,17 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastJumpBuff(float JumpVelocity);
+
+	/**
+	* Shield buff
+	*/
+	void ReplenishShield(float ShieldAmount, float ReplenishTime); // pickup类外部调用的函数
+
+	void ShieldRampUp(float DeltaTime);
+
+	bool bReplenishingShield = false;
+
+	float ShieldReplenishRate = 0.f;
+	float ShieldReplenishAmount = 0.f;
+
 };

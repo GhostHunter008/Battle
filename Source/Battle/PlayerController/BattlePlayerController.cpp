@@ -75,7 +75,7 @@ void ABattlePlayerController::SetHUDHealth(float Health, float MaxHealth)
 	}
 	else
 	{
-		bInitializeCharacterOverlay = true;
+		bInitializeHealth = true;
 		HUDHealth = Health;
 		HUDMaxHealth = MaxHealth;
 	}
@@ -95,7 +95,7 @@ void ABattlePlayerController::SetHUDScore(float Score)
 	}
 	else
 	{
-		bInitializeCharacterOverlay = true;
+		bInitializeScore = true;
 		HUDScore = Score;
 	}
 }
@@ -113,7 +113,7 @@ void ABattlePlayerController::SetHUDDefeats(int32 Defeats)
 	}
 	else
 	{
-		bInitializeCharacterOverlay = true;
+		bInitializeDefeats = true;
 		HUDDefeats = Defeats;
 	}
 }
@@ -246,7 +246,30 @@ void ABattlePlayerController::SetHUDGrenades(int32 Grenades)
 	}
 	else
 	{
+		bInitializeGrenades = true;
 		HUDGrenades = Grenades;
+	}
+}
+
+void ABattlePlayerController::SetHUDShield(float Shield, float MaxShield)
+{
+	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
+	bool bHUDValid = BattleHUD &&
+		BattleHUD->CharacterOverlay &&
+		BattleHUD->CharacterOverlay->ShieldBar &&
+		BattleHUD->CharacterOverlay->ShieldText;
+	if (bHUDValid)
+	{
+		const float ShieldPercent = Shield / MaxShield;
+		BattleHUD->CharacterOverlay->ShieldBar->SetPercent(ShieldPercent);
+		FString ShieldText = FString::Printf(TEXT("%d/%d"), FMath::CeilToInt(Shield), FMath::CeilToInt(MaxShield));
+		BattleHUD->CharacterOverlay->ShieldText->SetText(FText::FromString(ShieldText));
+	}
+	else
+	{
+		bInitializeShield = true;
+		HUDShield = Shield;
+		HUDMaxShield = MaxShield;
 	}
 }
 
@@ -259,14 +282,15 @@ void ABattlePlayerController::PollInit()
 			CharacterOverlay = BattleHUD->CharacterOverlay;
 			if (CharacterOverlay)
 			{
-				SetHUDHealth(HUDHealth, HUDMaxHealth);
-				SetHUDScore(HUDScore);
-				SetHUDDefeats(HUDDefeats);
+				if (bInitializeHealth) SetHUDHealth(HUDHealth, HUDMaxHealth);
+				if (bInitializeShield) SetHUDShield(HUDShield, HUDMaxShield);
+				if (bInitializeScore) SetHUDScore(HUDScore);
+				if (bInitializeDefeats) SetHUDDefeats(HUDDefeats);
 
 				ABattleCharacter* BattleCharacter = Cast<ABattleCharacter>(GetPawn());
 				if (BattleCharacter && BattleCharacter->GetCombat())
 				{
-					SetHUDGrenades(BattleCharacter->GetCombat()->GetGrenadeAmount());
+					if (bInitializeGrenades) SetHUDGrenades(BattleCharacter->GetCombat()->GetGrenadeAmount());
 				}
 			}
 		}

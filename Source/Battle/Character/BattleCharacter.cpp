@@ -74,6 +74,7 @@ void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(ABattleCharacter, OverlappingWeapon,COND_OwnerOnly); // 只同步到拥有的客户端（确定了同步给谁）
 	DOREPLIFETIME(ABattleCharacter,Health);
 	DOREPLIFETIME(ABattleCharacter,bDisableGameplay);
+	DOREPLIFETIME(ABattleCharacter, Shield);
 }
 
 void ABattleCharacter::PostInitializeComponents()
@@ -115,6 +116,7 @@ void ABattleCharacter::BeginPlay()
 	}
 
 	UpdateHUDHealth();
+	UpdateHUDShield();
 	if (HasAuthority())
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ABattleCharacter::ReceiveDamage);
@@ -634,20 +636,39 @@ void ABattleCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const U
 {
 	if (bElimmed) return; // 正在死亡无需再次受到伤害
 
-	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
+	float DamageToHealth = Damage;
+	if (Shield > 0.f)
+	{
+		if (Shield >= Damage)
+		{
+			// 减护盾
+			Shield = FMath::Clamp(Shield - Damage, 0.f, MaxShield);
+			DamageToHealth = 0.f;
+		}
+		else
+		{	
+			// 减血
+			Shield = 0.f;
+			DamageToHealth = FMath::Clamp(DamageToHealth - Shield, 0.f, Damage);
+		}
+	}
+
+	Health = FMath::Clamp(Health - DamageToHealth, 0.f, MaxHealth);
 
 	// 服务端的反应，在Onrep_health,对客户端进行同样的设置
 	UpdateHUDHealth();
+	// 服务端的反应，在Onrep_Shield,对客户端进行同样的设置
+	UpdateHUDShield();
 	PlayHitReactMontage();
 
 	if (Health <= 0.1f)
 	{
-		ABattleGameMode* BlasterGameMode = GetWorld()->GetAuthGameMode<ABattleGameMode>();
-		if (BlasterGameMode)
+		ABattleGameMode* BattleGameMode = GetWorld()->GetAuthGameMode<ABattleGameMode>();
+		if (BattleGameMode)
 		{
 			BattlePlayerController = BattlePlayerController == nullptr ? Cast<ABattlePlayerController>(Controller) : BattlePlayerController;
 			ABattlePlayerController* AttackerController = Cast<ABattlePlayerController>(InstigatorController);
-			BlasterGameMode->PlayerEliminated(this, BattlePlayerController, AttackerController);
+			BattleGameMode->PlayerEliminated(this, BattlePlayerController, AttackerController);
 		}
 	}
 }
@@ -755,10 +776,10 @@ void ABattleCharacter::PlayElimMontage()
 
 void ABattleCharacter::ElimTimerFinished()
 {
-	ABattleGameMode* BlasterGameMode = GetWorld()->GetAuthGameMode<ABattleGameMode>();
-	if (BlasterGameMode)
+	ABattleGameMode* BattleGameMode = GetWorld()->GetAuthGameMode<ABattleGameMode>();
+	if (BattleGameMode)
 	{
-		BlasterGameMode->RequestRespawn(this,GetController());
+		BattleGameMode->RequestRespawn(this,GetController());
 	}
 }
 
@@ -805,6 +826,24 @@ void ABattleCharacter::PlayThrowGrenadeMontage()
 	if (AnimInstance && ThrowGrenadeMontage)
 	{
 		AnimInstance->Montage_Play(ThrowGrenadeMontage);
+	}
+}
+
+void ABattleCharacter::OnRep_Shield(float LastShield)
+{
+	UpdateHUDShield();
+	if (Shield < LastShield)
+	{
+		PlayHitReactMontage();
+	}
+}
+
+void ABattleCharacter::UpdateHUDShield()
+{
+	BattlePlayerController = BattlePlayerController == nullptr ? Cast<ABattlePlayerController>(Controller) : BattlePlayerController;
+	if (BattlePlayerController)
+	{
+		BattlePlayerController->SetHUDShield(Shield, MaxShield);
 	}
 }
 
