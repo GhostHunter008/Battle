@@ -115,6 +115,8 @@ void ABattleCharacter::BeginPlay()
 		}
 	}
 
+	SpawnDefaultWeapon();
+	UpdateHUDAmmo();
 	UpdateHUDHealth();
 	UpdateHUDShield();
 	if (HasAuthority())
@@ -214,14 +216,15 @@ void ABattleCharacter::EquipButtonPress(const FInputActionValue& Value)
 
 	if (CombatComponent) 
 	{
-		if(HasAuthority()) // only server
-		{
-			CombatComponent->EquipWeapon(OverlappingWeapon);
-		}
-		else
-		{
-			ServerEquipButtonPressed(); // send RPC
-		}
+		//if(HasAuthority()) // only server
+		//{
+		//	CombatComponent->EquipWeapon(OverlappingWeapon);
+		//}
+		//else
+		//{
+		//	ServerEquipButtonPressed(); // send RPC
+		//}
+		ServerEquipButtonPressed(); // 两种写法是等效的
 	}
 }
 
@@ -686,7 +689,14 @@ void ABattleCharacter::Elim()
 {
 	if (CombatComponent && CombatComponent->EquippedWeapon)
 	{
-		CombatComponent->EquippedWeapon->Dropped();
+		if (CombatComponent->EquippedWeapon->bDestroyWeapon) 
+		{// 如果是玩家默认携带的，则销毁
+			CombatComponent->EquippedWeapon->Destroy();
+		}
+		else
+		{// 场景中的，则放下
+			CombatComponent->EquippedWeapon->Dropped();
+		}
 	}
 
 	MulticastElim();
@@ -844,6 +854,31 @@ void ABattleCharacter::UpdateHUDShield()
 	if (BattlePlayerController)
 	{
 		BattlePlayerController->SetHUDShield(Shield, MaxShield);
+	}
+}
+
+void ABattleCharacter::SpawnDefaultWeapon()
+{
+	ABattleGameMode* BattleGameMode = Cast<ABattleGameMode>(UGameplayStatics::GetGameMode(this));
+	UWorld* World = GetWorld();
+	if (BattleGameMode && World && !bElimmed && DefaultWeaponClass)
+	{
+		AWeapon* StartingWeapon = World->SpawnActor<AWeapon>(DefaultWeaponClass);
+		StartingWeapon->bDestroyWeapon = true;
+		if (CombatComponent)
+		{
+			CombatComponent->EquipWeapon(StartingWeapon);
+		}
+	}
+}
+
+void ABattleCharacter::UpdateHUDAmmo()
+{
+	BattlePlayerController = BattlePlayerController == nullptr ? Cast<ABattlePlayerController>(Controller) : BattlePlayerController;
+	if (BattlePlayerController && CombatComponent && CombatComponent->EquippedWeapon)
+	{
+		BattlePlayerController->SetHUDCarryAmmo(CombatComponent->CarriedAmmo);
+		BattlePlayerController->SetHUDWeaponAmmo(CombatComponent->EquippedWeapon->GetAmmo());
 	}
 }
 

@@ -48,9 +48,28 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	class AWeapon* EquippedWeapon;
 
-	void PlayEquipWeaponSound();
+	void PlayEquipWeaponSound(AWeapon* WeaponToEquip);
 
 	void DropEquippedWeapon();
+
+	/**
+	 * 副武器
+	 */
+	UPROPERTY(ReplicatedUsing = OnRep_SecondaryWeapon)
+	AWeapon* SecondaryWeapon;
+
+	UFUNCTION()
+	void OnRep_SecondaryWeapon();
+
+	void AttachActorToBackpack(AActor* ActorToAttach);
+
+	void EquipPrimaryWeapon(AWeapon* WeaponToEquip);
+
+	void EquipSecondaryWeapon(AWeapon* WeaponToEquip);
+
+	void SwapWeapons();
+
+	bool ShouldSwapWeapons();
 
 /************************************************************************/
 /* 瞄准                                                 
@@ -223,6 +242,8 @@ public:
 	int32 MaxGrenadeAmount = 4;
 
 	void UpdateHUDGrenadeAmount();
-	
+
+
+
 	
 };

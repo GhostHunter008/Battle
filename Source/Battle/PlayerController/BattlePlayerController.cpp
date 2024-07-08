@@ -129,6 +129,11 @@ void ABattlePlayerController::SetHUDWeaponAmmo(int32 Ammo)
 		FString WeaponAmmoText = FString::Printf(TEXT("%d"), Ammo);
 		BattleHUD->CharacterOverlay->WeaponAmmoAmount->SetText(FText::FromString(WeaponAmmoText));
 	}
+	else
+	{
+		bInitializeWeaponAmmo = true;
+		HUDWeaponAmmo = Ammo;
+	}
 }
 
 void ABattlePlayerController::SetHUDCarryAmmo(int32 Ammo)
@@ -141,6 +146,11 @@ void ABattlePlayerController::SetHUDCarryAmmo(int32 Ammo)
 	{
 		FString CarryAmmoText = FString::Printf(TEXT("%d"), Ammo);
 		BattleHUD->CharacterOverlay->CarryAmmoAmount->SetText(FText::FromString(CarryAmmoText));
+	}
+	else
+	{
+		bInitializeCarriedAmmo = true;
+		HUDCarriedAmmo = Ammo;
 	}
 }
 
@@ -286,6 +296,8 @@ void ABattlePlayerController::PollInit()
 				if (bInitializeShield) SetHUDShield(HUDShield, HUDMaxShield);
 				if (bInitializeScore) SetHUDScore(HUDScore);
 				if (bInitializeDefeats) SetHUDDefeats(HUDDefeats);
+				if (bInitializeCarriedAmmo) SetHUDCarryAmmo(HUDCarriedAmmo);
+				if (bInitializeWeaponAmmo) SetHUDWeaponAmmo(HUDWeaponAmmo);
 
 				ABattleCharacter* BattleCharacter = Cast<ABattleCharacter>(GetPawn());
 				if (BattleCharacter && BattleCharacter->GetCombat())

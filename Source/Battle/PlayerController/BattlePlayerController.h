@@ -55,6 +55,12 @@ public:
 	float HUDShield;
 	float HUDMaxShield;
 	bool bInitializeShield = false;
+
+	float HUDCarriedAmmo;
+	bool bInitializeCarriedAmmo = false;
+
+	float HUDWeaponAmmo;
+	bool bInitializeWeaponAmmo = false;
 /**
 * Sync time between client and server
 */

@@ -41,5 +41,15 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	class UNiagaraSystem* PickupEffect; // 配置资源，用来表示使用的效果
+
+	/*
+	*  延迟绑定Overlap
+	*  过早绑定会出现bug:玩家刚碰到物体，物体就被销毁
+	*  导致pickup spawnpoint中StartSpawnPickupTimer函数尚未绑定，导致spawnpoint无法再次生成物体
+	*/
+	FTimerHandle BindOverlapTimer;
+	float BindOverlapTime = 0.25f;
+	UFUNCTION()
+	void BindOverlapTimerFinished();
 	
 };

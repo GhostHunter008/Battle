@@ -10,6 +10,7 @@ enum class EWeaponState:uint8
 {
 	EWS_Initial UMETA(DisplayName="Initial State"),
 	EWS_Equipped UMETA(DisplayName = "Equipped State"),
+	EWS_EquippedSecondary UMETA(DisplayName = "Equipped Secondary"),
 	EWS_Dropped UMETA(DisplayName = "Dropped State"),
 
 	EWS_MAX UMETA(DisplayName = "DefaultMAX") // 可以帮助我们快速知道枚举的数量
@@ -35,6 +36,12 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	virtual void OnWeaponStateSet();
+	virtual void OnEquipped();
+	virtual void OnEquippedSecondary();
+	virtual void OnDropped();
+
 
 	// 绑定到AreaSphere的Overlap函数
 	UFUNCTION()
@@ -146,5 +153,9 @@ public:
 	* Enable or disable custom depth
 	*/
 	void EnableCustomDepth(bool bEnable);
+
+	// 如果是玩家出生时的自带武器，那么在玩家死亡时该武器会被销毁
+	// 否则，该武器会掉落
+	bool bDestroyWeapon = false;
 
 };

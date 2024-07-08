@@ -68,6 +68,7 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(UCombatComponent, EquippedWeapon);
+	DOREPLIFETIME(UCombatComponent, SecondaryWeapon);
 	DOREPLIFETIME(UCombatComponent, bAiming);
 	DOREPLIFETIME_CONDITION(UCombatComponent, CarriedAmmo,COND_OwnerOnly); // 只复制到拥有的客户端
 	DOREPLIFETIME(UCombatComponent, CombatState);
@@ -79,9 +80,29 @@ void UCombatComponent::EquipWeapon(class AWeapon* InWeapon)
 	if (BattleCharacter == nullptr || InWeapon == nullptr) return;
 	if (CombatState != ECombatState::ECS_Unoccupied) return;
 
+	if (EquippedWeapon != nullptr && SecondaryWeapon == nullptr)
+	{
+		EquipSecondaryWeapon(InWeapon);
+	}
+	else
+	{
+		EquipPrimaryWeapon(InWeapon);
+	}
+
+	// 由controller接管旋转
+	BattleCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
+	BattleCharacter->bUseControllerRotationYaw = true;
+
+	
+}
+
+void UCombatComponent::EquipPrimaryWeapon(AWeapon* WeaponToEquip)
+{
+	if (WeaponToEquip == nullptr) return;
+
 	DropEquippedWeapon();
 
-	EquippedWeapon = InWeapon;
+	EquippedWeapon = WeaponToEquip;
 	ReloadEmptyWeapon();
 
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
@@ -92,12 +113,51 @@ void UCombatComponent::EquipWeapon(class AWeapon* InWeapon)
 	// 设置携带的弹药
 	UpdateCarriedAmmo();
 
-	// 由controller接管旋转
-	BattleCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
-	BattleCharacter->bUseControllerRotationYaw = true;
-
 	// 播放声音
-	PlayEquipWeaponSound();
+	PlayEquipWeaponSound(WeaponToEquip);
+
+	EquippedWeapon->EnableCustomDepth(false);
+}
+
+void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
+{
+	if (WeaponToEquip == nullptr) return;
+
+	SecondaryWeapon = WeaponToEquip;
+	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	AttachActorToBackpack(WeaponToEquip);
+
+	PlayEquipWeaponSound(WeaponToEquip);
+
+	if (SecondaryWeapon->GetWeaponMesh())
+	{
+		SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
+		SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();
+	}
+
+	if (EquippedWeapon == nullptr) return;
+	EquippedWeapon->SetOwner(BattleCharacter);
+}
+
+void UCombatComponent::SwapWeapons()
+{
+	AWeapon* TempWeapon = EquippedWeapon;
+	EquippedWeapon = SecondaryWeapon;
+	SecondaryWeapon = TempWeapon;
+
+	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	AttachActorToRightHand(EquippedWeapon);
+	EquippedWeapon->SetupHUDAmmo();
+	UpdateCarriedAmmo();
+	PlayEquipWeaponSound(EquippedWeapon);
+
+	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
+	AttachActorToBackpack(SecondaryWeapon);
+}
+
+bool UCombatComponent::ShouldSwapWeapons()
+{
+	return (EquippedWeapon != nullptr && SecondaryWeapon != nullptr);
 }
 
 void UCombatComponent::OnRep_EquippedWeapon()
@@ -113,16 +173,17 @@ void UCombatComponent::OnRep_EquippedWeapon()
 	}
 
 	// 播放声音
-	PlayEquipWeaponSound();
+	PlayEquipWeaponSound(EquippedWeapon);
+	EquippedWeapon->EnableCustomDepth(false);
 }
 
-void UCombatComponent::PlayEquipWeaponSound()
+void UCombatComponent::PlayEquipWeaponSound(AWeapon* WeaponToEquip)
 {
-	if (EquippedWeapon && EquippedWeapon->EquipSound)
+	if (BattleCharacter && WeaponToEquip && WeaponToEquip->EquipSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(
 			this,
-			EquippedWeapon->EquipSound,
+			WeaponToEquip->EquipSound,
 			BattleCharacter->GetActorLocation()
 		);
 	}
@@ -486,6 +547,16 @@ void UCombatComponent::AttachActorToLeftHand(AActor* ActorToAttach)
 	}
 }
 
+void UCombatComponent::AttachActorToBackpack(AActor* ActorToAttach)
+{
+	if (BattleCharacter == nullptr || BattleCharacter->GetMesh() == nullptr || ActorToAttach == nullptr) return;
+	const USkeletalMeshSocket* BackpackSocket = BattleCharacter->GetMesh()->GetSocketByName(FName("BackpackSocket"));
+	if (BackpackSocket)
+	{
+		BackpackSocket->AttachActor(ActorToAttach, BattleCharacter->GetMesh());
+	}
+}
+
 void UCombatComponent::LaunchGrenade()
 {
 	ShowAttachedGrenade(false);
@@ -534,6 +605,21 @@ void UCombatComponent::UpdateHUDGrenadeAmount()
 	if (BattleController)
 	{
 		BattleController->SetHUDGrenades(GrenadeAmount);
+	}
+}
+
+void UCombatComponent::OnRep_SecondaryWeapon()
+{
+	if (SecondaryWeapon && BattleCharacter)
+	{
+		SecondaryWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+		AttachActorToBackpack(SecondaryWeapon);
+		PlayEquipWeaponSound(EquippedWeapon);
+		if (SecondaryWeapon->GetWeaponMesh())
+		{
+			SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
+			SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();
+		}
 	}
 }
 
