@@ -18,6 +18,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "Battle/PlayerState/BattlePlayerState.h"
 #include "Battle/Weapon/WeaponTypes.h"
+#include "Battle/BattleComponents/BuffComponent.h"
 
 
 ABattleCharacter::ABattleCharacter()
@@ -60,6 +61,9 @@ ABattleCharacter::ABattleCharacter()
 	AttachedGrenade = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Attached Grenade"));
 	AttachedGrenade->SetupAttachment(GetMesh(), FName("GrenadeSocket"));
 	AttachedGrenade->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	BuffComponent = CreateDefaultSubobject<UBuffComponent>(TEXT("BuffComponent"));
+	BuffComponent->SetIsReplicated(true);
 }
 
 void ABattleCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -78,6 +82,12 @@ void ABattleCharacter::PostInitializeComponents()
 	if (CombatComponent)
 	{
 		CombatComponent->BattleCharacter=this;
+	}
+	if (BuffComponent)
+	{
+		BuffComponent->BattleCharacter = this;
+		BuffComponent->SetInitialSpeeds(GetCharacterMovement()->MaxWalkSpeed,GetCharacterMovement()->MaxWalkSpeedCrouched);
+		BuffComponent->SetInitialJumpVelocity(GetCharacterMovement()->JumpZVelocity);
 	}
 }
 
@@ -501,10 +511,14 @@ void ABattleCharacter::HideCharacterIfCameraClose()
 	}
 }
 
-void ABattleCharacter::OnRep_Health()
+void ABattleCharacter::OnRep_Health(float LastHealth)
 {
 	UpdateHUDHealth();
-	PlayHitReactMontage();
+
+	if (Health < LastHealth)
+	{
+		PlayHitReactMontage();
+	}
 }
 
 AWeapon* ABattleCharacter::GetEquippedWeapon()

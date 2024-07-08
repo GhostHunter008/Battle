@@ -35,5 +35,11 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	UStaticMeshComponent* PickupMesh;
+
+	UPROPERTY(VisibleAnywhere)
+	class UNiagaraComponent* PickupEffectComponent; // 用来显示场景中固定的“Mesh”
+
+	UPROPERTY(EditAnywhere)
+	class UNiagaraSystem* PickupEffect; // 配置资源，用来表示使用的效果
 	
 };

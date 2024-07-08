@@ -149,10 +149,11 @@ public:
 	float Health = 100.f;
 
 	FORCEINLINE float GetHealth() const { return Health; }
+	FORCEINLINE void SetHealth(float Amount) { Health = Amount; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 
 	UFUNCTION()
-	void OnRep_Health();
+	void OnRep_Health(float LastHealth);
 
 	UFUNCTION()
 	void ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser);
@@ -245,4 +246,13 @@ public:
 	UStaticMeshComponent* AttachedGrenade;
 
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
+
+
+	/*
+	* Buff Component
+	*/
+	UPROPERTY(VisibleAnywhere)
+	class UBuffComponent* BuffComponent;
+
+	FORCEINLINE UBuffComponent* GetBuff() const { return BuffComponent; }
 };
