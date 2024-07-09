@@ -107,6 +107,7 @@ void UCombatComponent::EquipPrimaryWeapon(AWeapon* WeaponToEquip)
 
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 	AttachActorToRightHand(EquippedWeapon);
+
 	EquippedWeapon->SetOwner(BattleCharacter); // Owner引擎已经帮我们做好了同步
 	EquippedWeapon->SetupHUDAmmo(); // 服务端通过直接调用设置，客户端通过rep_owner设置弹药
 
@@ -115,8 +116,6 @@ void UCombatComponent::EquipPrimaryWeapon(AWeapon* WeaponToEquip)
 
 	// 播放声音
 	PlayEquipWeaponSound(WeaponToEquip);
-
-	EquippedWeapon->EnableCustomDepth(false);
 }
 
 void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
@@ -124,19 +123,38 @@ void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
 	if (WeaponToEquip == nullptr) return;
 
 	SecondaryWeapon = WeaponToEquip;
-	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
 	AttachActorToBackpack(WeaponToEquip);
-
+	SecondaryWeapon->SetOwner(BattleCharacter);
 	PlayEquipWeaponSound(WeaponToEquip);
+}
 
-	if (SecondaryWeapon->GetWeaponMesh())
+void UCombatComponent::OnRep_EquippedWeapon()
+{
+	if (EquippedWeapon && BattleCharacter)
 	{
-		SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
-		SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();
+		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+		AttachActorToRightHand(EquippedWeapon);
+
+		// 由controller接管旋转
+		BattleCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
+		BattleCharacter->bUseControllerRotationYaw = true;
 	}
 
-	if (EquippedWeapon == nullptr) return;
-	EquippedWeapon->SetOwner(BattleCharacter);
+	// 播放声音
+	PlayEquipWeaponSound(EquippedWeapon);
+	EquippedWeapon->SetupHUDAmmo();
+}
+
+void UCombatComponent::OnRep_SecondaryWeapon()
+{
+	if (SecondaryWeapon && BattleCharacter)
+	{
+		SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
+		AttachActorToBackpack(SecondaryWeapon);
+
+		PlayEquipWeaponSound(SecondaryWeapon);
+	}
 }
 
 void UCombatComponent::SwapWeapons()
@@ -158,23 +176,6 @@ void UCombatComponent::SwapWeapons()
 bool UCombatComponent::ShouldSwapWeapons()
 {
 	return (EquippedWeapon != nullptr && SecondaryWeapon != nullptr);
-}
-
-void UCombatComponent::OnRep_EquippedWeapon()
-{
-	if (EquippedWeapon && BattleCharacter)
-	{
-		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-		AttachActorToRightHand(EquippedWeapon);
-
-		// 由controller接管旋转
-		BattleCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
-		BattleCharacter->bUseControllerRotationYaw = true;
-	}
-
-	// 播放声音
-	PlayEquipWeaponSound(EquippedWeapon);
-	EquippedWeapon->EnableCustomDepth(false);
 }
 
 void UCombatComponent::PlayEquipWeaponSound(AWeapon* WeaponToEquip)
@@ -605,21 +606,6 @@ void UCombatComponent::UpdateHUDGrenadeAmount()
 	if (BattleController)
 	{
 		BattleController->SetHUDGrenades(GrenadeAmount);
-	}
-}
-
-void UCombatComponent::OnRep_SecondaryWeapon()
-{
-	if (SecondaryWeapon && BattleCharacter)
-	{
-		SecondaryWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-		AttachActorToBackpack(SecondaryWeapon);
-		PlayEquipWeaponSound(EquippedWeapon);
-		if (SecondaryWeapon->GetWeaponMesh())
-		{
-			SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
-			SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();
-		}
 	}
 }
 

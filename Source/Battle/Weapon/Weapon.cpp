@@ -38,6 +38,14 @@ AWeapon::AWeapon()
 	PickupWidget->SetupAttachment(GetRootComponent());
 }
 
+void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AWeapon, WeaponState);
+	DOREPLIFETIME(AWeapon, Ammo);
+}
+
 void AWeapon::BeginPlay()
 {
 	Super::BeginPlay();
@@ -54,6 +62,23 @@ void AWeapon::BeginPlay()
 		AreaSphere->OnComponentBeginOverlap.AddDynamic(this, &AWeapon::OnSphereOverlap);
 		AreaSphere->OnComponentEndOverlap.AddDynamic(this,&AWeapon::OnSphereEndOverlap);
 	}
+}
+
+void AWeapon::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+}
+
+void AWeapon::SetWeaponState(EWeaponState InWeaponState)
+{
+	WeaponState = InWeaponState;
+	OnWeaponStateSet();
+}
+
+void AWeapon::OnRep_WeaponState()
+{
+	OnWeaponStateSet();
 }
 
 void AWeapon::OnWeaponStateSet()
@@ -83,13 +108,13 @@ void AWeapon::OnEquipped()
 
 	if (WeaponType == EWeaponType::EWT_SubmachineGun)
 	{
-		// 开启表带物理模拟
+		// 开启冲锋枪表带物理模拟
 		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		WeaponMesh->SetEnableGravity(true);
 		WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	}
 
-	EnableCustomDepth(false);
+	EnableCustomDepth(false); 
 }
 
 void AWeapon::OnEquippedSecondary()
@@ -132,20 +157,6 @@ void AWeapon::OnDropped()
 	WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
 	WeaponMesh->MarkRenderStateDirty();
 	EnableCustomDepth(true);
-}
-
-void AWeapon::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-
-void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(AWeapon, WeaponState);
-	DOREPLIFETIME(AWeapon, Ammo);
 }
 
 void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -217,7 +228,11 @@ void AWeapon::OnRep_Owner()
 	}
 	else
 	{
-		SetupHUDAmmo();
+		BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(Owner) : BattleOwnerCharacter;
+		if (BattleOwnerCharacter && BattleOwnerCharacter->GetEquippedWeapon() && BattleOwnerCharacter->GetEquippedWeapon()==this)
+		{
+			SetupHUDAmmo();
+		}
 	}
 }
 
@@ -259,59 +274,6 @@ void AWeapon::ShowPickupWidget(bool bShowWidget)
 	{
 		PickupWidget->SetVisibility(bShowWidget);
 	}
-}
-
-void AWeapon::SetWeaponState(EWeaponState InWeaponState)
-{
-	WeaponState = InWeaponState;
-
-	switch (WeaponState) 
-	{
-	case EWeaponState::EWS_Equipped:
-	{
-		ShowPickupWidget(false);
-		AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		WeaponMesh->SetSimulatePhysics(false);
-		WeaponMesh->SetEnableGravity(false);
-		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-		// 表带物理（挂件物理）
-		if (WeaponType == EWeaponType::EWT_SubmachineGun)
-		{
-			WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-			WeaponMesh->SetEnableGravity(true);
-			WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-		}
-
-		// 关闭轮廓高亮
-		// EnableCustomDepth(false); // 副武器也有轮廓
-		break;
-	}
-	case EWeaponState::EWS_Dropped:
-	{
-		if (HasAuthority())
-		{
-			AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		}
-		WeaponMesh->SetSimulatePhysics(true);
-		WeaponMesh->SetEnableGravity(true);
-		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Block);
-		WeaponMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Ignore);
-		WeaponMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
-
-		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
-		WeaponMesh->MarkRenderStateDirty();
-		EnableCustomDepth(true);
-
-		break;
-	}
-	}
-}
-
-void AWeapon::OnRep_WeaponState()
-{
-	OnWeaponStateSet();
 }
 
 void AWeapon::Fire(const FVector& HitTarget)

@@ -29,6 +29,12 @@ public:
 	void ShowPickupWidget(bool bShowWidget);
 
 	void SetWeaponState(EWeaponState InWeaponState);
+	virtual void OnWeaponStateSet();
+
+	virtual void OnEquipped();
+	virtual void OnEquippedSecondary();
+	virtual void OnDropped();
+
 	FORCEINLINE class USphereComponent* GetAreaSphere() const{return AreaSphere;}
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const{return WeaponMesh;}
 
@@ -36,12 +42,6 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-
-	virtual void OnWeaponStateSet();
-	virtual void OnEquipped();
-	virtual void OnEquippedSecondary();
-	virtual void OnDropped();
-
 
 	// 绑定到AreaSphere的Overlap函数
 	UFUNCTION()

@@ -232,7 +232,14 @@ void ABattleCharacter::ServerEquipButtonPressed_Implementation()
 {
 	if (CombatComponent)
 	{
-		CombatComponent->EquipWeapon(OverlappingWeapon);
+		if (OverlappingWeapon)
+		{
+			CombatComponent->EquipWeapon(OverlappingWeapon);
+		}
+		else if (CombatComponent->ShouldSwapWeapons())
+		{
+			CombatComponent->SwapWeapons();
+		}
 	}
 }
 
@@ -687,18 +694,18 @@ void ABattleCharacter::UpdateHUDHealth()
 
 void ABattleCharacter::Elim()
 {
-	if (CombatComponent && CombatComponent->EquippedWeapon)
-	{
-		if (CombatComponent->EquippedWeapon->bDestroyWeapon) 
-		{// 如果是玩家默认携带的，则销毁
-			CombatComponent->EquippedWeapon->Destroy();
-		}
-		else
-		{// 场景中的，则放下
-			CombatComponent->EquippedWeapon->Dropped();
-		}
-	}
-
+	//if (CombatComponent && CombatComponent->EquippedWeapon)
+	//{
+	//	if (CombatComponent->EquippedWeapon->bDestroyWeapon) 
+	//	{// 如果是玩家默认携带的，则销毁
+	//		CombatComponent->EquippedWeapon->Destroy();
+	//	}
+	//	else
+	//	{// 场景中的，则放下
+	//		CombatComponent->EquippedWeapon->Dropped();
+	//	}
+	//}
+	DropOrDestroyWeapons();
 	MulticastElim();
 	GetWorldTimerManager().SetTimer(
 		ElimTimer,
@@ -879,6 +886,34 @@ void ABattleCharacter::UpdateHUDAmmo()
 	{
 		BattlePlayerController->SetHUDCarryAmmo(CombatComponent->CarriedAmmo);
 		BattlePlayerController->SetHUDWeaponAmmo(CombatComponent->EquippedWeapon->GetAmmo());
+	}
+}
+
+void ABattleCharacter::DropOrDestroyWeapons()
+{
+	if (CombatComponent)
+	{
+		if (CombatComponent->EquippedWeapon)
+		{
+			DropOrDestroyWeapon(CombatComponent->EquippedWeapon);
+		}
+		if (CombatComponent->SecondaryWeapon)
+		{
+			DropOrDestroyWeapon(CombatComponent->SecondaryWeapon);
+		}
+	}
+}
+
+void ABattleCharacter::DropOrDestroyWeapon(AWeapon* Weapon)
+{
+	if (Weapon == nullptr) return;
+	if (Weapon->bDestroyWeapon)
+	{
+		Weapon->Destroy();
+	}
+	else
+	{
+		Weapon->Dropped();
 	}
 }
 

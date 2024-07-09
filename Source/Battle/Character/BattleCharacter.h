@@ -283,4 +283,8 @@ public:
 	void SpawnDefaultWeapon();
 
 	void UpdateHUDAmmo();
+
+	void DropOrDestroyWeapons();
+
+	void DropOrDestroyWeapon(AWeapon* Weapon);
 };
