@@ -79,8 +79,11 @@ public:
 	UFUNCTION(Server,Reliable)
 	void ServerSetAiming(bool InbAiming);
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_Aiming)
 	bool bAiming;
+	UFUNCTION()
+	void OnRep_Aiming();
+	bool bAimButtonPressed = false; // 客户端预测变量
 
 	// 以十字准线为基准，进行射线检测
 	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
@@ -111,12 +114,24 @@ public:
 	bool bFireButtonPressed;
 
 	void Fire();
+	void LocalFire(const FVector_NetQuantize& TraceHitTarget); // 服务端客户端都先执行效果，优化延迟
+	void ShotgunLocalFire(const TArray<FVector_NetQuantize>& TraceHitTargets);
+
+	void FireProjectileWeapon();
+	void FireHitScanWeapon();
+	void FireShotgun();
 
 	UFUNCTION(Server, Reliable)
 	void ServerFire(const FVector_NetQuantize& TraceHitTarget); // FVector_NetQuantize 网络传输优化的结构体
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
+
+	UFUNCTION(Server, Reliable)
+	void ServerShotgunFire(const TArray<FVector_NetQuantize>& TraceHitTargets);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastShotgunFire(const TArray<FVector_NetQuantize>& TraceHitTargets);
 
 	// Auto Fire
 	FTimerHandle FireTimer;
@@ -126,6 +141,8 @@ public:
 	void FireTimerFinished();
 
 	bool CanFire();
+
+	
 
 /************************************************************************/
 /* 准星扩散
@@ -150,6 +167,8 @@ public:
 	
 	UFUNCTION(Server, Reliable)
 	void ServerReload();
+
+	bool bLocallyReloading = false; // 客户端本地预测,仅与local端有效
 
 	void ReloadEmptyWeapon(); // 自动换单
 

@@ -101,6 +101,13 @@ void UBattleCharacterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	bElimmed=BattleCharacter->IsElimmed();
 
 	bUseFABRIK = BattleCharacter->GetCombatState() == ECombatState::ECS_Unoccupied;
+	if (BattleCharacter->IsLocallyControlled() && BattleCharacter->GetCombatState() != ECombatState::ECS_ThrowingGrenade)
+	{
+		// 原因：因为local是换单动画先行，其CombatState尚未被同步为ECS_Unoccupied就已经在播放动画了
+		// 所以在此处进行修改，以local变量为准
+		bUseFABRIK = !BattleCharacter->IsLocallyReloading(); 
+	}
+
 	bUseAimOffset = BattleCharacter->GetCombatState() == ECombatState::ECS_Unoccupied && !BattleCharacter->GetDisableGameplay();
 	bTransformRightHand = BattleCharacter->GetCombatState() == ECombatState::ECS_Unoccupied && !BattleCharacter->GetDisableGameplay();
 }

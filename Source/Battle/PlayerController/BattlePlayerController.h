@@ -111,13 +111,28 @@ public:
 	void HandleMatchHasStarted();
 	void HandleCooldown();
 
+/************************************************************************/
+/*  High Ping                               
+/************************************************************************/
+	
+	void CheckPing(float DeltaTime);
+	void HighPingWarning();
+	void StopHighPingWarning();
+
+	UPROPERTY(EditAnywhere)
+	float CheckPingFrequency = 20.f; // 每20秒进行一次检查
+	float HighPingRunningTime = 0.f;
+
+	UPROPERTY(EditAnywhere)
+	float HighPingThreshold = 50.f; // 高于该值则判定为HighPing，播放动画
+
+	UPROPERTY(EditAnywhere)
+	float HighPingDuration = 5.f;  // 播放HighPing动画的总时长，多于该时间停止播放
+	float PingAnimationRunningTime = 0.f;
 
 private:
 	class ABattleHUD* BattleHUD;
 	class UCharacterOverlay* CharacterOverlay;
 	class ABattleGameMode* BattleGameMode;
-
-
-
 
 };

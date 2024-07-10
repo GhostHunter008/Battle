@@ -13,6 +13,7 @@
 #include "Camera/CameraComponent.h"
 #include "Sound/SoundCue.h"
 #include "Battle/Weapon/Projectile.h"
+#include "Battle/Weapon/Shotgun.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -159,6 +160,8 @@ void UCombatComponent::OnRep_SecondaryWeapon()
 
 void UCombatComponent::SwapWeapons()
 {
+	if (CombatState != ECombatState::ECS_Unoccupied) return;
+
 	AWeapon* TempWeapon = EquippedWeapon;
 	EquippedWeapon = SecondaryWeapon;
 	SecondaryWeapon = TempWeapon;
@@ -208,6 +211,8 @@ void UCombatComponent::SetAiming(bool InbAiming)
 	{
 		BattleCharacter->ShowSniperScopeWidget(InbAiming);
 	}
+
+	if (BattleCharacter->IsLocallyControlled()) bAimButtonPressed = InbAiming;
 }
 
 void UCombatComponent::ServerSetAiming_Implementation(bool InbAiming)
@@ -216,6 +221,14 @@ void UCombatComponent::ServerSetAiming_Implementation(bool InbAiming)
 	if (BattleCharacter)
 	{
 		BattleCharacter->GetCharacterMovement()->MaxWalkSpeed = bAiming ? AimWalkSpeed : BaseWalkSpeed;
+	}
+}
+
+void UCombatComponent::OnRep_Aiming()
+{
+	if (BattleCharacter && BattleCharacter->IsLocallyControlled())
+	{
+		bAiming = bAimButtonPressed;
 	}
 }
 
@@ -375,12 +388,84 @@ void UCombatComponent::Fire()
 	if (CanFire())
 	{
 		bCanFire = false;
-		ServerFire(HitTarget);
+
+		// 准星扩散
 		if (EquippedWeapon)
 		{
 			CrosshairShootingFactor = .75f;
+
+			switch (EquippedWeapon->FireType)
+			{
+			case EFireType::EFT_Projectile:
+				FireProjectileWeapon();
+				break;
+			case EFireType::EFT_HitScan:
+				FireHitScanWeapon();
+				break;
+			case EFireType::EFT_Shotgun:
+				FireShotgun();
+				break;
+			}
 		}
+
 		StartFireTimer();
+	}
+}
+
+void UCombatComponent::LocalFire(const FVector_NetQuantize& TraceHitTarget)
+{
+	if (EquippedWeapon == nullptr) return;
+
+	if (BattleCharacter && CombatState == ECombatState::ECS_Unoccupied)
+	{
+		BattleCharacter->PlayFireMontage(bAiming);
+		EquippedWeapon->Fire(TraceHitTarget);
+	}
+}
+
+void UCombatComponent::ShotgunLocalFire(const TArray<FVector_NetQuantize>& TraceHitTargets)
+{
+	AShotgun* Shotgun = Cast<AShotgun>(EquippedWeapon);
+	if (Shotgun == nullptr || BattleCharacter == nullptr) return;
+	if (CombatState == ECombatState::ECS_Reloading || CombatState == ECombatState::ECS_Unoccupied)
+	{
+		BattleCharacter->PlayFireMontage(bAiming);
+		Shotgun->FireShotgun(TraceHitTargets);
+		CombatState = ECombatState::ECS_Unoccupied;
+	}
+}
+
+void UCombatComponent::FireProjectileWeapon()
+{
+	if (EquippedWeapon)
+	{
+		// 如果愿意的话，projectile也可以增加散射
+		HitTarget = EquippedWeapon->bUseScatter ? EquippedWeapon->TraceEndWithScatter(HitTarget) : HitTarget;
+		ServerFire(HitTarget);
+		LocalFire(HitTarget); // 表现效果先行
+	}
+}
+
+void UCombatComponent::FireHitScanWeapon()
+{
+	if (EquippedWeapon)
+	{
+		HitTarget = EquippedWeapon->bUseScatter ? EquippedWeapon->TraceEndWithScatter(HitTarget) : HitTarget;
+		LocalFire(HitTarget); // 由Local决定，将目标传递给服务器，再multicast就同步了
+		ServerFire(HitTarget);
+	}
+}
+
+void UCombatComponent::FireShotgun()
+{
+	AShotgun* Shotgun = Cast<AShotgun>(EquippedWeapon);
+	if (Shotgun)
+	{
+		TArray<FVector_NetQuantize> HitTargets;
+		Shotgun->ShotgunTraceEndWithScatter(HitTarget, HitTargets);
+
+		ShotgunLocalFire(HitTargets);
+		ServerShotgunFire(HitTargets);
 	}
 }
 
@@ -391,22 +476,19 @@ void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& Trac
 
 void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
-	if (EquippedWeapon == nullptr) return;
-	
-	// 霰弹枪特意化处理
-	if (BattleCharacter && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
-	{
-		BattleCharacter->PlayFireMontage(bAiming);
-		EquippedWeapon->Fire(TraceHitTarget);
-		CombatState = ECombatState::ECS_Unoccupied;
-		return;
-	}
+	if (BattleCharacter && BattleCharacter->IsLocallyControlled()) return; // 1p跳过
+	LocalFire(TraceHitTarget);
+}
 
-	if (BattleCharacter && CombatState == ECombatState::ECS_Unoccupied)
-	{
-		BattleCharacter->PlayFireMontage(bAiming);
-		EquippedWeapon->Fire(TraceHitTarget);
-	}
+void UCombatComponent::ServerShotgunFire_Implementation(const TArray<FVector_NetQuantize>& TraceHitTargets)
+{
+	MulticastShotgunFire(TraceHitTargets);
+}
+
+void UCombatComponent::MulticastShotgunFire_Implementation(const TArray<FVector_NetQuantize>& TraceHitTargets)
+{
+	if (BattleCharacter && BattleCharacter->IsLocallyControlled()) return; // 1p跳过
+	ShotgunLocalFire(TraceHitTargets);
 }
 
 void UCombatComponent::StartFireTimer()
@@ -429,15 +511,13 @@ void UCombatComponent::FireTimerFinished()
 		Fire();
 	}
 
-	if (EquippedWeapon->IsEmpty())
-	{
-		Reload();
-	}
+	ReloadEmptyWeapon();
 }
 
 bool UCombatComponent::CanFire()
 {
 	if(EquippedWeapon==nullptr) return false;
+	if (bLocallyReloading) return false;
 
 	// 霰弹枪专有逻辑，可以在撞弹过程中进行打断
 	if (!EquippedWeapon->IsEmpty() && bCanFire && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun) return true;
@@ -611,17 +691,11 @@ void UCombatComponent::UpdateHUDGrenadeAmount()
 
 void UCombatComponent::Reload()
 {
-	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_Unoccupied && EquippedWeapon && !EquippedWeapon->IsFull())
+	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_Unoccupied && EquippedWeapon && !EquippedWeapon->IsFull() && !bLocallyReloading)
 	{
 		ServerReload();
-	}
-}
-
-void UCombatComponent::ReloadEmptyWeapon()
-{
-	if (EquippedWeapon->IsEmpty())
-	{
-		Reload();
+		HandleReload(); // 本地预测，提前播放动画
+		bLocallyReloading = true; 
 	}
 }
 
@@ -629,8 +703,16 @@ void UCombatComponent::ServerReload_Implementation()
 {
 	if (BattleCharacter==nullptr || EquippedWeapon == nullptr) return;
 
-	CombatState=ECombatState::ECS_Reloading;
-	HandleReload();
+	CombatState=ECombatState::ECS_Reloading; // 同步的变量
+	if (!BattleCharacter->IsLocallyControlled()) HandleReload(); // 如果是服务器端发起，无需执行两次
+}
+
+void UCombatComponent::HandleReload()
+{
+	if (BattleCharacter)
+	{
+		BattleCharacter->PlayReloadMontage();
+	}
 }
 
 void UCombatComponent::OnRep_CombatState()
@@ -639,7 +721,8 @@ void UCombatComponent::OnRep_CombatState()
 	{
 	case ECombatState::ECS_Reloading:
 	{
-		HandleReload();
+		if (BattleCharacter && !BattleCharacter->IsLocallyControlled())
+			HandleReload();
 		break;
 	}
 	case ECombatState::ECS_ThrowingGrenade:
@@ -659,10 +742,20 @@ void UCombatComponent::FinishReloading()
 {
 	if(BattleCharacter==nullptr) return;
 
+	bLocallyReloading = false;
+
 	if (BattleCharacter->HasAuthority())
 	{
 		CombatState = ECombatState::ECS_Unoccupied;
 		UpdateAmmoValues();
+	}
+}
+
+void UCombatComponent::ReloadEmptyWeapon()
+{
+	if (EquippedWeapon->IsEmpty())
+	{
+		Reload();
 	}
 }
 
@@ -776,9 +869,4 @@ void UCombatComponent::OnRep_CarriedAmmo()
 	{
 		JumpToShotgunEnd();
 	}
-}
-
-void UCombatComponent::HandleReload()
-{
-	BattleCharacter->PlayReloadMontage();
 }

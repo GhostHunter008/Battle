@@ -16,6 +16,19 @@ enum class EWeaponState:uint8
 	EWS_MAX UMETA(DisplayName = "DefaultMAX") // 可以帮助我们快速知道枚举的数量
 };
 
+// 原来是服务端和客户端各自算各自的，但是以服务端为准
+// 客户端把本地计算的结果传给服务器，进行命中判定
+// 这个枚举体用来表示传给服务端的数据
+UENUM(BlueprintType)
+enum class EFireType : uint8
+{
+	EFT_HitScan UMETA(DisplayName = "Hit Scan Weapon"),
+	EFT_Projectile UMETA(DisplayName = "Projectile Weapon"),
+	EFT_Shotgun UMETA(DisplayName = "Shotgun Weapon"),
+
+	EFT_MAX UMETA(DisplayName = "DefaultMAX")
+};
+
 UCLASS()
 class BATTLE_API AWeapon : public AActor
 {
@@ -39,6 +52,9 @@ public:
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const{return WeaponMesh;}
 
 	virtual void Fire(const FVector& HitTarget);
+
+	UPROPERTY(EditAnywhere)
+	EFireType FireType;
 
 protected:
 	virtual void BeginPlay() override;
@@ -125,11 +141,23 @@ public:
 	UPROPERTY(EditAnywhere)
 	int32 MagCapacity; // 枪中的容量
 	 
-	UPROPERTY(EditAnywhere,ReplicatedUsing=OnRep_Ammo)
-	int32 Ammo; // 枪中的子弹
+	//UPROPERTY(EditAnywhere,ReplicatedUsing=OnRep_Ammo)
+	//int32 Ammo; // 枪中的子弹
+	//UFUNCTION()
+	//void OnRep_Ammo();
 
-	UFUNCTION()
-	void OnRep_Ammo();
+	UPROPERTY(EditAnywhere)
+	int32 Ammo;  // 客户端预测
+
+	UFUNCTION(Client, Reliable)
+	void ClientUpdateAmmo(int32 ServerAmmo);
+
+	UFUNCTION(Client, Reliable)
+	void ClientAddAmmo(int32 AmmoToAdd);
+
+	// The number of unprocessed server requests for Ammo.
+	// Incremented in SpendRound, decremented in ClientUpdateAmmo.
+	int32 Sequence = 0;
 
 	void SpendRound(); // 减少弹药的操作应该只在服务器调用
 
@@ -157,5 +185,17 @@ public:
 	// 如果是玩家出生时的自带武器，那么在玩家死亡时该武器会被销毁
 	// 否则，该武器会掉落
 	bool bDestroyWeapon = false;
+
+	/**
+	* Trace end with scatter
+	*/
+	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
+	float DistanceToSphere = 800.f; // 以该距离进行画球进行散射
+	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
+	float SphereRadius = 75.f;  // 散射球的球体半径
+	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
+	bool bUseScatter = false;
+
+	FVector TraceEndWithScatter(const FVector& HitTarget); // 以枪口位置为起点
 
 };

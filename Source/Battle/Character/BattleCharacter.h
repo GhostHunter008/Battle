@@ -227,6 +227,8 @@ public:
 	*/
 	ECombatState GetCombatState() const;
 
+	bool IsLocallyReloading();
+
 	/*Scope*/
 	UFUNCTION(BlueprintImplementableEvent)
 	void ShowSniperScopeWidget(bool bShowScope);

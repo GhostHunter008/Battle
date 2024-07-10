@@ -14,6 +14,8 @@
 #include "Battle/BattleComponents/CombatComponent.h"
 #include "Battle/GameState/BattleGameState.h"
 #include "Battle/PlayerState/BattlePlayerState.h"
+#include "GameFramework/PlayerState.h"
+#include "Components/Image.h"
 
 void ABattlePlayerController::BeginPlay()
 {
@@ -57,6 +59,7 @@ void ABattlePlayerController::Tick(float DeltaTime)
 	SetHUDTime(); // 绘制时间
 	CheckTimeSync(DeltaTime); // 每隔一段时间重新同步一次，即设置正确的ClientServerDelta
 	PollInit(); // 轮询，直到HUD被创建（这种实现并不好）
+	CheckPing(DeltaTime); 
 }
 
 void ABattlePlayerController::SetHUDHealth(float Health, float MaxHealth)
@@ -467,6 +470,71 @@ void ABattlePlayerController::HandleCooldown()
 		if (BattleCharacter->GetCombat())
 		{
 			BattleCharacter->GetCombat()->FireButtonPress(false);
+		}
+	}
+}
+
+void ABattlePlayerController::CheckPing(float DeltaTime)
+{
+	HighPingRunningTime += DeltaTime;
+	if (HighPingRunningTime > CheckPingFrequency)
+	{
+		PlayerState = PlayerState == nullptr ? GetPlayerState<APlayerState>() : PlayerState;
+		if (PlayerState)
+		{
+			//if (PlayerState->GetCompressedPing() * 4 > HighPingThreshold) // ping is compressed; it's actually ping / 4
+			if (PlayerState->GetPingInMilliseconds()> HighPingThreshold)
+			{
+				HighPingWarning();
+				PingAnimationRunningTime = 0.f;
+			}
+		}
+		HighPingRunningTime = 0.f;
+	}
+	bool bHighPingAnimationPlaying =
+		BattleHUD && BattleHUD->CharacterOverlay &&
+		BattleHUD->CharacterOverlay->HighPingAnimation &&
+		BattleHUD->CharacterOverlay->IsAnimationPlaying(BattleHUD->CharacterOverlay->HighPingAnimation);
+	if (bHighPingAnimationPlaying)
+	{
+		PingAnimationRunningTime += DeltaTime;
+		if (PingAnimationRunningTime > HighPingDuration)
+		{
+			StopHighPingWarning();
+		}
+	}
+}
+
+void ABattlePlayerController::HighPingWarning()
+{
+	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
+	bool bHUDValid = BattleHUD &&
+		BattleHUD->CharacterOverlay &&
+		BattleHUD->CharacterOverlay->HighPingImage &&
+		BattleHUD->CharacterOverlay->HighPingAnimation;
+	if (bHUDValid)
+	{
+		BattleHUD->CharacterOverlay->HighPingImage->SetOpacity(1.f);
+		BattleHUD->CharacterOverlay->PlayAnimation(
+			BattleHUD->CharacterOverlay->HighPingAnimation,
+			0.f, // 播放时间
+			5);  // 循环次数
+	}
+}
+
+void ABattlePlayerController::StopHighPingWarning()
+{
+	BattleHUD = BattleHUD == nullptr ? Cast<ABattleHUD>(GetHUD()) : BattleHUD;
+	bool bHUDValid = BattleHUD &&
+		BattleHUD->CharacterOverlay &&
+		BattleHUD->CharacterOverlay->HighPingImage &&
+		BattleHUD->CharacterOverlay->HighPingAnimation;
+	if (bHUDValid)
+	{
+		BattleHUD->CharacterOverlay->HighPingImage->SetOpacity(0.f);
+		if (BattleHUD->CharacterOverlay->IsAnimationPlaying(BattleHUD->CharacterOverlay->HighPingAnimation))
+		{
+			BattleHUD->CharacterOverlay->StopAnimation(BattleHUD->CharacterOverlay->HighPingAnimation);
 		}
 	}
 }

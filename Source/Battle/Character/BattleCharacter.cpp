@@ -323,7 +323,6 @@ void ABattleCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon) // 确定了
 }
 
 
-// 服务端单独处理：实质上这个函数也只有服务端回调
 void ABattleCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
 	if (OverlappingWeapon)
@@ -332,7 +331,7 @@ void ABattleCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 	}
 
 	OverlappingWeapon = Weapon;
-	if (IsLocallyControlled()) // 服务器端的逻辑单独处理
+	if (IsLocallyControlled()) // 本地控制
 	{
 		if (OverlappingWeapon)
 		{
@@ -835,6 +834,12 @@ ECombatState ABattleCharacter::GetCombatState() const
 {
 	if (CombatComponent == nullptr) return ECombatState::ECS_MAX;
 	return CombatComponent->CombatState;
+}
+
+bool ABattleCharacter::IsLocallyReloading()
+{
+	if (CombatComponent == nullptr) return false;
+	return CombatComponent->bLocallyReloading;
 }
 
 void ABattleCharacter::PlayThrowGrenadeMontage()
