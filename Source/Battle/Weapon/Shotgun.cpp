@@ -8,10 +8,12 @@
 #include "particles/ParticleSystemComponent.h"
 #include "Sound/SoundCue.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Battle/PlayerController/BattlePlayerController.h"
+#include "Battle/BattleComponents/LagCompensationComponent.h"
 
 void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 {
-	AWeapon::Fire(FVector()); // Ìø¹ýHitScanWeapon²ã
+	AWeapon::Fire(FVector()); // è·³è¿‡HitScanWeaponå±‚
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (OwnerPawn == nullptr) return;
 	AController* InstigatorController = OwnerPawn->GetController();
@@ -63,17 +65,37 @@ void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 				}
 			}
 		}
-		// Ò»´ÎÐÔ½áËãÉËº¦
+		
+		TArray<ABattleCharacter*> HitCharacters;
 		for (auto HitPair : HitMap)
 		{
-			if (HitPair.Key && HasAuthority() && InstigatorController)
+			if (HitPair.Key && InstigatorController)
 			{
-				UGameplayStatics::ApplyDamage(
-					HitPair.Key, // Character that was hit
-					Damage * HitPair.Value, // Multiply Damage by number of times hit
-					InstigatorController,
-					this,
-					UDamageType::StaticClass()
+				if (HasAuthority() && !bUseServerSideRewind)
+				{
+					// ä¸€æ¬¡æ€§ç»“ç®—ä¼¤å®³
+					UGameplayStatics::ApplyDamage(
+						HitPair.Key, // Character that was hit
+						Damage * HitPair.Value, // Multiply Damage by number of times hit
+						InstigatorController,
+						this,
+						UDamageType::StaticClass()
+					);
+				}
+			}
+			HitCharacters.Add(HitPair.Key);
+		}
+		if (!HasAuthority() && bUseServerSideRewind)
+		{
+			BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(OwnerPawn) : BattleOwnerCharacter;
+			BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(InstigatorController) : BattleOwnerPlayerController;
+			if (BattleOwnerPlayerController && BattleOwnerCharacter && BattleOwnerCharacter->GetLagCompensation() && BattleOwnerCharacter->IsLocallyControlled()) // 1p
+			{
+				BattleOwnerCharacter->GetLagCompensation()->ShotgunServerScoreRequest(
+					HitCharacters,
+					Start,
+					HitTargets,
+					BattleOwnerPlayerController->GetServerTime() - BattleOwnerPlayerController->SingleTripTime
 				);
 			}
 		}

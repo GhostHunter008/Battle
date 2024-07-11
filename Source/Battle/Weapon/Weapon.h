@@ -87,10 +87,6 @@ private:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class ABulletShell> BulletShellClass;
 
-
-	class ABattleCharacter* BattleOwnerCharacter=nullptr;
-	class ABattlePlayerController* BattleOwnerPlayerController=nullptr;
-
 public:
 	/*
 	* Texture for the weapon crosshairs
@@ -198,4 +194,18 @@ public:
 
 	FVector TraceEndWithScatter(const FVector& HitTarget); // 以枪口位置为起点
 
+	/* Damage
+	*  Only useful for HitScanWeapon 
+	*/
+
+	UPROPERTY(EditAnywhere)
+	float Damage = 20.f; 
+
+	FORCEINLINE float GetDamage() const { return Damage; }
+
+	UPROPERTY(EditAnywhere)
+	bool bUseServerSideRewind = false;
+
+	class ABattleCharacter* BattleOwnerCharacter = nullptr;
+	class ABattlePlayerController* BattleOwnerPlayerController = nullptr;
 };

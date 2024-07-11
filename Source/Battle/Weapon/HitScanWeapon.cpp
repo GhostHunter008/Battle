@@ -9,8 +9,9 @@
 #include "Sound/SoundCue.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "WeaponTypes.h"
-
 #include "DrawDebugHelpers.h"
+#include "Battle/PlayerController/BattlePlayerController.h"
+#include "Battle/BattleComponents/LagCompensationComponent.h"
 
 void AHitScanWeapon::Fire(const FVector& HitTarget)
 {
@@ -29,17 +30,38 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 		FHitResult FireHit;
 		WeaponTraceHit(Start, HitTarget, FireHit);
 
+		// æ–½åŠ ä¼¤å®³çš„é€»è¾‘
 		ABattleCharacter* BattleCharacter = Cast<ABattleCharacter>(FireHit.GetActor());
-		if (BattleCharacter && HasAuthority() && InstigatorController)
+		if (BattleCharacter && InstigatorController)
 		{
-			UGameplayStatics::ApplyDamage(
-				BattleCharacter,
-				Damage,
-				InstigatorController,
-				this,
-				UDamageType::StaticClass()
-			);
+			// TODO: è¿™é‡Œé€»è¾‘ä¸å®Œæ•´
+			if (HasAuthority() && !bUseServerSideRewind)
+			{
+				UGameplayStatics::ApplyDamage(
+					BattleCharacter,
+					Damage,
+					InstigatorController,
+					this,
+					UDamageType::StaticClass()
+				);
+			}
+			if (!HasAuthority() && bUseServerSideRewind && BattleCharacter->IsLocallyControlled()) // 1p
+			{
+				BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(OwnerPawn) : BattleOwnerCharacter;
+				BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(InstigatorController) : BattleOwnerPlayerController;
+				if (BattleOwnerPlayerController && BattleOwnerCharacter && BattleOwnerCharacter->GetLagCompensation())
+				{
+					BattleOwnerCharacter->GetLagCompensation()->ServerScoreRequest(
+						BattleCharacter,
+						Start,
+						HitTarget,
+						BattleOwnerPlayerController->GetServerTime() - BattleOwnerPlayerController->SingleTripTime,
+						this
+					);
+				}
+			}
 		}
+
 		if (ImpactParticles)
 		{
 			UGameplayStatics::SpawnEmitterAtLocation(
@@ -83,7 +105,7 @@ void AHitScanWeapon::WeaponTraceHit(const FVector& TraceStart, const FVector& Hi
 	if (World)
 	{
 		//FVector End = bUseScatter ? TraceEndWithScatter(TraceStart, HitTarget) : TraceStart + (HitTarget - TraceStart) * 1.25f;
-		FVector End = TraceStart + (HitTarget - TraceStart) * 1.25f; // HitTargetÊÇÍâ½ç´«ÈëµÄ£¬ÎÞÐèÔÙ½øÐÐ±¾µØ¼ÆËã
+		FVector End = TraceStart + (HitTarget - TraceStart) * 1.25f; // HitTargetæ˜¯å¤–ç•Œä¼ å…¥çš„ï¼Œæ— éœ€å†è¿›è¡Œæœ¬åœ°è®¡ç®—
 		World->LineTraceSingleByChannel(
 			OutHit,
 			TraceStart,

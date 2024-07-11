@@ -20,8 +20,8 @@ public:
 protected:
 	void WeaponTraceHit(const FVector& TraceStart, const FVector& HitTarget, FHitResult& OutHit);
 
-	UPROPERTY(EditAnywhere)
-	float Damage = 20.f;
+	//UPROPERTY(EditAnywhere)  // 绉诲姩鍒皐eapon绫讳腑
+	//float Damage = 20.f; 
 
 	UPROPERTY(EditAnywhere)
 	class UParticleSystem* ImpactParticles;
@@ -34,7 +34,7 @@ private:
 	UPROPERTY(EditAnywhere)
 	class UParticleSystem* BeamParticles;
 
-	// 有些资产没有武器动画，则自己配置
+	// 鏈変簺璧勪骇娌℃湁姝﹀櫒鍔ㄧ敾锛屽垯鑷繁閰嶇疆
 	UPROPERTY(EditAnywhere)
 	UParticleSystem* MuzzleFlash;
 	UPROPERTY(EditAnywhere)

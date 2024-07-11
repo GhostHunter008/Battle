@@ -64,6 +64,7 @@ public:
 /**
 * Sync time between client and server
 */
+	float SingleTripTime = 0.f; // 半个RTT的时间
 
 	virtual float GetServerTime(); // Synced with server world clock
 	
