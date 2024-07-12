@@ -2,7 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Battle/Battle.h"
 #include "LagCompensationComponent.generated.h"
+
 
 USTRUCT(BlueprintType)
 struct FBoxInformation  // 用于存储BoxComponent的位置信息
@@ -93,6 +95,15 @@ public:
 		float HitTime
 	);
 
+	// 1p调用的函数,projectile 类武器特制 （服务端没必要倒带）
+	UFUNCTION(Server, Reliable)
+	void ProjectileServerScoreRequest(
+		ABattleCharacter* HitCharacter,
+		const FVector_NetQuantize& TraceStart,
+		const FVector_NetQuantize100& InitialVelocity,
+		float HitTime
+	);
+
 	TDoubleLinkedList<FFramePackage> FrameHistory; // 双链表,头部是最新帧，尾部是旧的帧
 
 	UPROPERTY(EditAnywhere)
@@ -143,6 +154,23 @@ public:
 		const TArray<FVector_NetQuantize>& HitLocations
 	);
 
+	/*
+	* Projectile
+	*/
+	FServerSideRewindResult ProjectileServerSideRewind(
+		ABattleCharacter* HitCharacter,
+		const FVector_NetQuantize& TraceStart,
+		const FVector_NetQuantize100& InitialVelocity,
+		float HitTime
+	);
+
+	FServerSideRewindResult ProjectileConfirmHit(
+		const FFramePackage& Package,
+		ABattleCharacter* HitCharacter,
+		const FVector_NetQuantize& TraceStart,
+		const FVector_NetQuantize100& InitialVelocity,
+		float HitTime
+	);
 
 public:	
 	// 在character的PostInitializeComponents()中初始化

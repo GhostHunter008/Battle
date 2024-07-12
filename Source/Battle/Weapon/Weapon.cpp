@@ -45,6 +45,7 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 
 	DOREPLIFETIME(AWeapon, WeaponState);
 	//DOREPLIFETIME(AWeapon, Ammo);
+	DOREPLIFETIME_CONDITION(AWeapon, bUseServerSideRewind, COND_OwnerOnly);
 }
 
 void AWeapon::BeginPlay()
@@ -115,6 +116,16 @@ void AWeapon::OnEquipped()
 	}
 
 	EnableCustomDepth(false); 
+
+	BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(GetOwner()) : BattleOwnerCharacter;
+	if (BattleOwnerCharacter && bUseServerSideRewind)
+	{
+		BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(BattleOwnerCharacter->Controller) : BattleOwnerPlayerController;
+		if (BattleOwnerPlayerController && HasAuthority() && !BattleOwnerPlayerController->HighPingDelegate.IsBound())
+		{
+			BattleOwnerPlayerController->HighPingDelegate.AddDynamic(this, &AWeapon::OnPingTooHigh);
+		}
+	}
 }
 
 void AWeapon::OnEquippedSecondary()
@@ -133,11 +144,21 @@ void AWeapon::OnEquippedSecondary()
 		WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	}
 
-	EnableCustomDepth(true);
+	// EnableCustomDepth(true);
 	if (WeaponMesh)
 	{
 		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
 		WeaponMesh->MarkRenderStateDirty();
+	}
+
+	BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(GetOwner()) : BattleOwnerCharacter;
+	if (BattleOwnerCharacter)
+	{
+		BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(BattleOwnerCharacter->Controller) : BattleOwnerPlayerController;
+		if (BattleOwnerPlayerController && HasAuthority() && BattleOwnerPlayerController->HighPingDelegate.IsBound())
+		{
+			BattleOwnerPlayerController->HighPingDelegate.RemoveDynamic(this, &AWeapon::OnPingTooHigh);
+		}
 	}
 }
 
@@ -157,6 +178,16 @@ void AWeapon::OnDropped()
 	WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
 	WeaponMesh->MarkRenderStateDirty();
 	EnableCustomDepth(true);
+
+	BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(GetOwner()) : BattleOwnerCharacter;
+	if (BattleOwnerCharacter)
+	{
+		BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(BattleOwnerCharacter->Controller) : BattleOwnerPlayerController;
+		if (BattleOwnerPlayerController && HasAuthority() && BattleOwnerPlayerController->HighPingDelegate.IsBound())
+		{
+			BattleOwnerPlayerController->HighPingDelegate.RemoveDynamic(this, &AWeapon::OnPingTooHigh);
+		}
+	}
 }
 
 void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -372,4 +403,9 @@ FVector AWeapon::TraceEndWithScatter(const FVector& HitTarget)
 		true);*/
 
 	return FVector(TraceStart + ToEndLoc * TRACE_LENGTH / ToEndLoc.Size());
+}
+
+void AWeapon::OnPingTooHigh(bool bPingTooHigh)
+{
+	bUseServerSideRewind = !bPingTooHigh;
 }

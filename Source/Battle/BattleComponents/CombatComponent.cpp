@@ -160,8 +160,45 @@ void UCombatComponent::OnRep_SecondaryWeapon()
 
 void UCombatComponent::SwapWeapons()
 {
-	if (CombatState != ECombatState::ECS_Unoccupied) return;
+	//if (CombatState != ECombatState::ECS_Unoccupied) return;
 
+	//AWeapon* TempWeapon = EquippedWeapon;
+	//EquippedWeapon = SecondaryWeapon;
+	//SecondaryWeapon = TempWeapon;
+
+	//EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	//AttachActorToRightHand(EquippedWeapon);
+	//EquippedWeapon->SetupHUDAmmo();
+	//UpdateCarriedAmmo();
+	//PlayEquipWeaponSound(EquippedWeapon);
+
+	//SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
+	//AttachActorToBackpack(SecondaryWeapon);
+	if (CombatState != ECombatState::ECS_Unoccupied || BattleCharacter == nullptr || !BattleCharacter->HasAuthority()) return;
+
+	BattleCharacter->PlaySwapMontage();
+	CombatState = ECombatState::ECS_SwappingWeapons;
+	BattleCharacter->bFinishedSwapping = false;
+	if (SecondaryWeapon) SecondaryWeapon->EnableCustomDepth(false);
+}
+
+bool UCombatComponent::ShouldSwapWeapons()
+{
+	return (EquippedWeapon != nullptr && SecondaryWeapon != nullptr);
+}
+
+void UCombatComponent::FinishSwap()
+{
+	if (BattleCharacter && BattleCharacter->HasAuthority())
+	{
+		CombatState = ECombatState::ECS_Unoccupied;
+	}
+	if (BattleCharacter) BattleCharacter->bFinishedSwapping = true;
+	if (SecondaryWeapon) SecondaryWeapon->EnableCustomDepth(true);
+}
+
+void UCombatComponent::FinishSwapAttachWeapons()
+{
 	AWeapon* TempWeapon = EquippedWeapon;
 	EquippedWeapon = SecondaryWeapon;
 	SecondaryWeapon = TempWeapon;
@@ -174,11 +211,6 @@ void UCombatComponent::SwapWeapons()
 
 	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
 	AttachActorToBackpack(SecondaryWeapon);
-}
-
-bool UCombatComponent::ShouldSwapWeapons()
-{
-	return (EquippedWeapon != nullptr && SecondaryWeapon != nullptr);
 }
 
 void UCombatComponent::PlayEquipWeaponSound(AWeapon* WeaponToEquip)
@@ -517,11 +549,10 @@ void UCombatComponent::FireTimerFinished()
 bool UCombatComponent::CanFire()
 {
 	if(EquippedWeapon==nullptr) return false;
-	if (bLocallyReloading) return false;
 
 	// 霰弹枪专有逻辑，可以在撞弹过程中进行打断
 	if (!EquippedWeapon->IsEmpty() && bCanFire && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun) return true;
-	
+	if (bLocallyReloading) return false;
 	return !EquippedWeapon->IsEmpty() && bCanFire && CombatState==ECombatState::ECS_Unoccupied;
 }
 
@@ -732,6 +763,14 @@ void UCombatComponent::OnRep_CombatState()
 			BattleCharacter->PlayThrowGrenadeMontage();
 			AttachActorToLeftHand(EquippedWeapon);
 			ShowAttachedGrenade(true);
+		}
+		break;
+	}
+	case ECombatState::ECS_SwappingWeapons:
+	{
+		if (BattleCharacter && !BattleCharacter->IsLocallyControlled())
+		{
+			BattleCharacter->PlaySwapMontage();
 		}
 		break;
 	}

@@ -4,6 +4,7 @@
 #include "GameFramework/PlayerController.h"
 #include "BattlePlayerController.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FHighPingDelegate, bool, bPingTooHigh);
 
 UCLASS()
 class BATTLE_API ABattlePlayerController : public APlayerController
@@ -116,6 +117,11 @@ public:
 /*  High Ping                               
 /************************************************************************/
 	
+	FHighPingDelegate HighPingDelegate;
+
+	UFUNCTION(Server, Reliable)
+	void ServerReportPingStatus(bool bHighPing);
+
 	void CheckPing(float DeltaTime);
 	void HighPingWarning();
 	void StopHighPingWarning();

@@ -34,8 +34,8 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 		ABattleCharacter* BattleCharacter = Cast<ABattleCharacter>(FireHit.GetActor());
 		if (BattleCharacter && InstigatorController)
 		{
-			// TODO: 这里逻辑不完整
-			if (HasAuthority() && !bUseServerSideRewind)
+			bool bCauseAuthDamage = !bUseServerSideRewind || OwnerPawn->IsLocallyControlled();
+			if (HasAuthority() && bCauseAuthDamage)
 			{
 				UGameplayStatics::ApplyDamage(
 					BattleCharacter,
@@ -45,7 +45,7 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					UDamageType::StaticClass()
 				);
 			}
-			if (!HasAuthority() && bUseServerSideRewind && BattleCharacter->IsLocallyControlled()) // 1p
+			if (!HasAuthority() && bUseServerSideRewind) // 1p
 			{
 				BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(OwnerPawn) : BattleOwnerCharacter;
 				BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(InstigatorController) : BattleOwnerPlayerController;

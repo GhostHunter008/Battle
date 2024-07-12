@@ -71,7 +71,8 @@ void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 		{
 			if (HitPair.Key && InstigatorController)
 			{
-				if (HasAuthority() && !bUseServerSideRewind)
+				bool bCauseAuthDamage = !bUseServerSideRewind || OwnerPawn->IsLocallyControlled();
+				if (HasAuthority() && bCauseAuthDamage)
 				{
 					// 一次性结算伤害
 					UGameplayStatics::ApplyDamage(
@@ -85,11 +86,11 @@ void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 			}
 			HitCharacters.Add(HitPair.Key);
 		}
-		if (!HasAuthority() && bUseServerSideRewind)
+		if (!HasAuthority() && bUseServerSideRewind && BattleOwnerCharacter->IsLocallyControlled()) // 1p
 		{
 			BattleOwnerCharacter = BattleOwnerCharacter == nullptr ? Cast<ABattleCharacter>(OwnerPawn) : BattleOwnerCharacter;
 			BattleOwnerPlayerController = BattleOwnerPlayerController == nullptr ? Cast<ABattlePlayerController>(InstigatorController) : BattleOwnerPlayerController;
-			if (BattleOwnerPlayerController && BattleOwnerCharacter && BattleOwnerCharacter->GetLagCompensation() && BattleOwnerCharacter->IsLocallyControlled()) // 1p
+			if (BattleOwnerPlayerController && BattleOwnerCharacter && BattleOwnerCharacter->GetLagCompensation())
 			{
 				BattleOwnerCharacter->GetLagCompensation()->ShotgunServerScoreRequest(
 					HitCharacters,

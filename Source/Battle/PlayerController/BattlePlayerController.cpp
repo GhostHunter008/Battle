@@ -475,8 +475,15 @@ void ABattlePlayerController::HandleCooldown()
 	}
 }
 
+void ABattlePlayerController::ServerReportPingStatus_Implementation(bool bHighPing)
+{
+	HighPingDelegate.Broadcast(bHighPing);
+}
+
 void ABattlePlayerController::CheckPing(float DeltaTime)
 {
+	if (HasAuthority()) return;
+
 	HighPingRunningTime += DeltaTime;
 	if (HighPingRunningTime > CheckPingFrequency)
 	{
@@ -488,6 +495,11 @@ void ABattlePlayerController::CheckPing(float DeltaTime)
 			{
 				HighPingWarning();
 				PingAnimationRunningTime = 0.f;
+				ServerReportPingStatus(true);
+			}
+			else
+			{
+				ServerReportPingStatus(false);
 			}
 		}
 		HighPingRunningTime = 0.f;

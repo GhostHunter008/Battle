@@ -337,4 +337,14 @@ public:
 	UBoxComponent* foot_l;
 	UPROPERTY(EditAnywhere)
 	UBoxComponent* foot_r;
+
+	/*
+	* swap 动画
+	*/
+	UPROPERTY(EditAnywhere, Category = Combat)
+	UAnimMontage* SwapMontage;
+
+	void PlaySwapMontage();
+
+	bool bFinishedSwapping = false;
 };

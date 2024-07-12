@@ -203,8 +203,11 @@ public:
 
 	FORCEINLINE float GetDamage() const { return Damage; }
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(Replicated, EditAnywhere) // 由Ping值决定是否使用SSR
 	bool bUseServerSideRewind = false;
+
+	UFUNCTION()
+	void OnPingTooHigh(bool bPingTooHigh);
 
 	class ABattleCharacter* BattleOwnerCharacter = nullptr;
 	class ABattlePlayerController* BattleOwnerPlayerController = nullptr;

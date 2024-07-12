@@ -71,6 +71,12 @@ public:
 
 	bool ShouldSwapWeapons();
 
+	UFUNCTION(BlueprintCallable)
+	void FinishSwap();
+
+	UFUNCTION(BlueprintCallable)
+	void FinishSwapAttachWeapons();
+
 /************************************************************************/
 /* 瞄准                                                 
 /************************************************************************/
